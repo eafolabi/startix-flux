@@ -1,0 +1,104 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: ignition-server
+  namespace: infra
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-ignition-server/ignition-server-flux
+  insecure: true
+  ref:
+    tag: ${ignition_server_version:=0.39.1}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ignition-server
+  namespace: infra
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: ignition-server
+    namespace: infra
+  targetNamespace: infra
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      # yamllint disable-line rule:line-length
+      image_nginx_url: ghcr.io/gc-private/b2-docker-image-ignition-nginx/ignition-nginx:${ignition_nginx:=0.12.0}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-inventory
+  namespace: infra
+data:
+  static.yaml: |
+    ---
+    all:
+      ignition_server: ${ignition_server}
+      join_token_server: ${join_token_server}
+      dns_server: ${kubedns_service_ip}
+      evpn_rr1_server: ${evpn_rr1_service_ip}
+      evpn_rr2_server: ${evpn_rr2_service_ip}
+      ntp_service_ip: ${ntp_service_ip}
+
+    # QEMU/Dev hosts
+    #
+    # Shared settings for QEMU libvirt control plane
+    x-qemu-control: &qemu-control
+      mode: install
+      installed_mode: k8s-node
+      install_disk_path: pci-0000:04:00.0
+      join_token: control-plane-host
+      nics:
+        - [eth0]
+    # QEMU libvirt domains for control plane
+    qemu-vm1-control-plane:
+      << : [*qemu-control]
+      ip: 10.8.2.10
+      router_ip: 10.8.2.11
+      asn: 65303
+      mac:
+        - 52:54:00:39:20:5a
+    qemu-vm2-control-plane:
+      << : [*qemu-control]
+      ip: 10.8.2.12
+      router_ip: 10.8.2.13
+      asn: 65304
+      mac:
+        - 52:54:00:ed:e1:00
+    qemu-vm3-control-plane:
+      << : [*qemu-control]
+      ip: 10.8.2.14
+      router_ip: 10.8.2.15
+      asn: 65305
+      mac:
+        - 52:54:00:d7:5e:7d
+    # Entry for seedling so that Kyverno can generate the BGPEER
+    b2-seedling:
+      ip: 10.8.2.2
+      router_ip: 10.8.2.3
+      asn: 65111
+    # QEMU libvirt domain for vSwitch/vRouter
+    # no MAC address parity required between libvirt domain and this value
+    # chosen only for ease on typing during PXE boot
+    qemu-vrouter:
+      mode: router
+      skip_default: true
+      interfaces:
+        eth1:
+          10.9.0.1
+        eth2:
+          10.9.0.5
+        eth3:
+          10.9.0.9
+      ip: 10.8.0.1
+      asn: 65400
+      mac:
+        - 00:00:00:00:00:01

@@ -1,0 +1,27 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pypi-server
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1g
+    # No oauth proxy here to allow for use with pip
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: pypi-server-credentials
+    nginx.ingress.kubernetes.io/auth-realm: 'B2 PyPI repo'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - pypi.${environment}.b2.gcdev.zone
+  rules:
+    - host: pypi.${environment}.b2.gcdev.zone
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pypi-server
+                port:
+                  number: 8080

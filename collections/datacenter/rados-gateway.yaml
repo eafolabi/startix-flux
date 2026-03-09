@@ -1,0 +1,22 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: rados-gateway
+  namespace: rados-gateway
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: rados-gateway
+  path: ./apps/rados-gateway
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      s3_service_ip: ${s3_service_ip:=192.0.2.0}
+      service_anycast_ipv4: ${service_anycast_ipv4:=192.0.2.0}

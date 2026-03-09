@@ -1,0 +1,119 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: harbor-proxy-config
+spec:
+  template:
+    metadata:
+      labels:
+        app: harbor-proxy-config
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: harbor-proxy-config
+          # rationale for nixery: if this runs, we are setting up a cluster and can live debug
+          image: nixery.dev/shell/curl/jq/gnugrep
+          command:
+            - bash
+            - -eEuc
+            # yamllint disable rule:line-length
+            - |
+              set -o pipefail
+
+              url="http://harbor.harbor.svc.cluster.local/api/v2.0"
+              user=$(cat /run/credentials/username)
+              realPassword=$(cat /run/credentials/password)
+              installPassword=$(cat /run/credentials/installPassword)
+              ghcrUsername=$(cat /run/credentials/ghcrUsername)
+              ghcrPassword=$(cat /run/credentials/ghcrPassword)
+
+              function wrappedCurl() {
+                  curl -s --fail -u $user:$realPassword -H 'Content-Type: application/json' "$@"
+              }
+
+              function createRegistry()
+              {
+                  wrappedCurl -X POST "$url/registries" -d "{\"name\": \"$1\", \"url\": \"https://$1\", $2}" -i | grep -i ^location: | cut -d' ' -f2 | grep -o '[^/]*$'
+              }
+
+              function createProject()
+              {
+                  wrappedCurl -X POST "$url/projects" -d "{\"public\": true, \"project_name\": \"$1\", \"registry_id\": $2}"
+              }
+
+              echo "Waiting for API to be up and healthy..."
+              while [[ $(wrappedCurl --no-fail "$url/health/" | jq -r 'all(.components[]; .status == "healthy") and .status == "healthy"') != "true" ]]
+              do
+                  sleep 1
+              done
+              echo "API is healthy!"
+
+              echo "Checking if the real password works yet..."
+              if [[ $(wrappedCurl --no-fail "$url/users/current" -o /dev/null -w "%{http_code}") == "401" ]]
+              then
+                  echo "Changing install password to the real one..."
+                  userId=$(wrappedCurl -u $user:$installPassword "$url/users/current" | jq -r '.user_id')
+                  wrappedCurl -u $user:$installPassword -X PUT "$url/users/$userId/password" -d "{\"old_password\": \"$installPassword\", \"new_password\": \"$realPassword\"}"
+              fi
+              echo "Authentication worked!"
+
+              echo "Querying existing registries..."
+              declare -A existingRegistries=()
+              while IFS='|' read -r name id
+              do
+                  echo "ID $id: $name"
+                  existingRegistries[$name]=$id
+              done < <(wrappedCurl "$url/registries" | jq -r '.[] | .name + "|" + (.id|tostring)')
+
+              echo "Querying existing projects..."
+              declare -A existingProjects=()
+              while IFS='|' read -r name id
+              do
+                  echo "ID $id: $name"
+                  existingProjects[$name]=$id
+              done < <(wrappedCurl "$url/projects" | jq -r '.[] | .name + "|" + (.project_id|tostring)')
+
+              declare -A targetRegistries=()
+              targetRegistries[quay.io]='"type": "quay"'
+              targetRegistries[nixery.dev]='"type": "docker-registry"'
+              targetRegistries[registry.k8s.io]='"type": "docker-registry"'
+              targetRegistries[docker.elastic.co]='"type": "docker-registry"'
+              targetRegistries[k8s.gcr.io]='"type": "docker-registry"'
+              targetRegistries[ghcr.io]="\"type\": \"github-ghcr\", \"credential\": {\"type\": \"basic\", \"access_key\": \"$ghcrUsername\", \"access_secret\": \"$ghcrPassword\"}"
+              targetRegistries[docker.io]='"type": "docker-hub"'
+
+              echo "Creating missing registries and projects..."
+              for registry in "${!targetRegistries[@]}"
+              do
+                  if [[ -z ${existingRegistries[$registry]:-} ]]; then
+                      echo "Creating registry $registry..."
+                      existingRegistries[$registry]=$(createRegistry "$registry" "${targetRegistries[$registry]}")
+                  fi
+                  if [[ -z ${existingProjects[$registry]:-} ]]; then
+                      echo "Creating project $registry..."
+                      createProject "$registry" "${existingRegistries[$registry]}"
+                  fi
+                  echo "$registry is done!"
+              done
+              if [[ -z ${existingProjects[local]:-} ]]; then
+                echo "Creating local project..."
+                createProject local null
+              fi
+              echo "Successfully created all registries and projects!"
+
+              echo "Setting Garbage Collector schedule"
+              wrappedCurl -X PUT "$url/system/gc/schedule" -d '{"parameters": {"delete_untagged": false,"dry_run": false},"schedule": {"type": "Daily","cron": "0 0 0 * * *"}}'
+              echo "Done!"
+            # yamllint enable rule:line-length
+          volumeMounts:
+            - name: credentials
+              mountPath: /run/credentials
+              readOnly: true
+      volumes:
+        - name: credentials
+          secret:
+            secretName: harbor-credentials
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists

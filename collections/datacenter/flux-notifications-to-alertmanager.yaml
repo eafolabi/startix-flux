@@ -1,0 +1,42 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: alertmanager
+  namespace: flux-system
+spec:
+  type: alertmanager
+  secretRef:
+    name: alertmanager-address
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: flux-notifications-to-alertmanager
+  namespace: flux-system
+spec:
+  summary: "${environment} cluster"
+  providerRef:
+    name: alertmanager
+  eventSeverity: error
+  eventSources:
+    - kind: GitRepository
+      name: '*'
+    - kind: Kustomization
+      name: '*'
+    - kind: HelmRepository
+      name: '*'
+    - kind: HelmRelease
+      name: '*'
+    - kind: HelmChart
+      name: '*'
+---
+# yamllint disable rule:line-length
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-address
+  namespace: flux-system
+stringData:
+  # keep unencrypted as long as no secrets are contained in the URL
+  address: http://alertmanager-main.prometheus.svc.cluster.local:9093/api/v2/alerts/

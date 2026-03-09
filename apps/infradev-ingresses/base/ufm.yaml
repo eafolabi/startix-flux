@@ -1,0 +1,51 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ufm
+  namespace: noc
+spec:
+  ports:
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ufm
+  namespace: noc
+subsets:
+  - addresses:
+      - ip: ${ufm_address}
+    ports:
+      - port: 443
+        protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  name: ufm
+  namespace: noc
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ufm.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - backend:
+              service:
+                name: ufm
+                port:
+                  number: 443
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - ufm.${environment}.b2.${base_domain}

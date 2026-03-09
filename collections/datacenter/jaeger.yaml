@@ -1,0 +1,62 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: jaeger-operator
+  namespace: observability
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/jaeger/operator
+  prune: true
+  wait: true
+  timeout: 10m0s
+  patches:
+    - target:
+        kind: Deployment
+        name: jaeger-operator
+        namespace: observability
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: jaeger-operator
+          namespace: observability
+        spec:
+          template:
+            metadata:
+              labels:
+                b2.genesiscloud.dev/expose-to-apiserver: 'true'
+                b2.genesiscloud.dev/allow-to-apiserver: 'true'
+            spec:
+              tolerations:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: Exists
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: jaeger-cluster
+  namespace: observability
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: observability
+  path: ./apps/jaeger/cluster
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+      b2_dataplane_network: ${b2_dataplane_network}
+  dependsOn:
+    - name: jaeger-operator
+      namespace: observability

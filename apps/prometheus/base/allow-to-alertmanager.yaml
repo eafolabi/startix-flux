@@ -1,0 +1,16 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-alertmanager
+spec:
+  selector: b2.genesiscloud.dev/allow-to-alertmanager == 'true'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          namespace: prometheus
+          name: alertmanager-operated

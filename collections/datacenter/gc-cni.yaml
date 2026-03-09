@@ -1,0 +1,28 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: gc-cni
+  namespace: customer-network
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-cni/cni-flux
+  insecure: true
+  ref:
+    tag: ${gc_cni_flux:=0.2.1}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gc-cni
+  namespace: customer-network
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: gc-cni
+  targetNamespace: customer-network
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s

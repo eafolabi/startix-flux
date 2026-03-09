@@ -1,0 +1,128 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    akvorado.service: akvorado-inlet
+  name: akvorado-inlet
+spec:
+  type: ClusterIP
+  clusterIP: ${akvorado_service_ip}
+  externalIPs:
+    - ${service_anycast_ipv4}
+  ports:
+    - name: "2055"
+      port: 2055
+      protocol: UDP
+      targetPort: 2055
+    - name: "6343"
+      port: 6343
+      protocol: UDP
+      targetPort: 6343
+    - name: "10179"
+      port: 10179
+      targetPort: 10179
+  selector:
+    akvorado.service: akvorado-inlet
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    akvorado.service: zookeeper
+  name: zookeeper
+spec:
+  ports:
+    - name: "2181"
+      port: 2181
+      targetPort: 2181
+    - name: "2888"
+      port: 2888
+      targetPort: 2888
+    - name: "3888"
+      port: 3888
+      targetPort: 3888
+    - name: "7000"
+      port: 7000
+      targetPort: 7000
+  selector:
+    akvorado.service: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    akvorado.service: kafka
+  name: kafka
+spec:
+  ports:
+    - name: "9092"
+      port: 9092
+      targetPort: 9092
+  selector:
+    akvorado.service: kafka
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    akvorado.service: clickhouse
+  name: clickhouse
+spec:
+  ports:
+    - name: "8123"
+      port: 8123
+      targetPort: 8123
+    - name: "9000"
+      port: 9000
+      targetPort: 9000
+  selector:
+    akvorado.service: clickhouse
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    akvorado.service: akvorado-orchestrator
+  name: akvorado-orchestrator
+spec:
+  ports:
+    - name: "8080"
+      port: 8080
+      targetPort: 8080
+  selector:
+    akvorado.service: akvorado-orchestrator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    akvorado.service: redis
+  name: redis
+spec:
+  ports:
+    - name: "6379"
+      port: 6379
+      targetPort: 6379
+  selector:
+    akvorado.service: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    akvorado.service: akvorado-console
+  name: akvorado-console
+spec:
+  ports:
+    - name: "8080"
+      port: 8080
+      targetPort: 8080
+  selector:
+    akvorado.service: akvorado-console

@@ -1,0 +1,42 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: loki-internal
+spec:
+  selector: app.kubernetes.io/name == "loki"
+  ingress:
+    - action: Allow
+      source:
+        selector: app.kubernetes.io/name == "loki"
+  egress:
+    - action: Allow
+      destination:
+        selector: app.kubernetes.io/name == "loki"
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: loki-access
+spec:
+  selector: app.kubernetes.io/name == "loki" && app.kubernetes.io/component in { "read", "write" }
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 3100
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: promtail
+spec:
+  selector: app.kubernetes.io/name == "promtail"
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: loki-write
+          namespace: monitoring

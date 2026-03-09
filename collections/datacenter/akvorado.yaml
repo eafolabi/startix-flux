@@ -1,0 +1,27 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: akvorado
+  namespace: akvorado
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: akvorado
+  path: ./apps/akvorado
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+      core_router_node_flow_ip1: ${core_router_node_flow_ip1:=192.0.2.0/32}
+      core_router_node_flow_ip2: ${core_router_node_flow_ip2:=192.0.2.1/32}
+      core_router_node_flow_ip3: ${core_router_node_flow_ip3:=192.0.2.2/32}
+      akvorado_pvc_size: ${akvorado_pvc_size:=2Gi}
+      akvorado_service_ip: ${akvorado_service_ip:=192.0.2.0}
+      service_anycast_ipv4: ${service_anycast_ipv4:=192.0.2.0}

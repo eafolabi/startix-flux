@@ -1,0 +1,28 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-cert-manager
+spec:
+  selector: app.kubernetes.io/instance == 'cert-manager'
+  types:
+    - Ingress
+    - Egress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 9402
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports: # needs to talk to the public internet
+          - 80
+          - 443
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports: # needs to talk to the public internet
+          - 53

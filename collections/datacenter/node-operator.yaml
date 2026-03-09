@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: node-operator
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: node-operator
+  namespace: node-operator
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-node-operator/node-operator-flux
+  insecure: true
+  ref:
+    tag: ${node_operator_flux:=0.4.2}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: node-rebooter
+  namespace: node-operator
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: node-operator
+  targetNamespace: node-operator
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s

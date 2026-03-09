@@ -1,0 +1,26 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ntp
+  namespace: noc
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: noc
+  path: ./apps/ntp
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+      ntp_service_ip: ${ntp_service_ip}
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

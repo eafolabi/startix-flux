@@ -1,0 +1,146 @@
+---
+# yamllint disable rule:line-length
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: flux-system
+  name: cluster-config
+data:
+  environment: euc-de-muc-1
+  base_domain: gcdev.zone
+  environment_flag_emoji: "flag-bavaria"
+  b2_dataplane_network: 10.8.0.0/16
+  b2_service_network: 10.7.0.0/16
+  b2_api_vip: 10.8.2.1
+  kubedns_service_ip: 10.7.0.10
+  elastiflow_service_ip: 10.7.0.20
+  pxe_dhcp_service_ip: 10.7.0.30
+  evpn_rr1_service_ip: 10.7.0.40
+  evpn_rr2_service_ip: 10.7.0.41
+  ntp_service_ip: 10.7.0.50
+  s3_service_ip: 10.7.0.51
+  dns_service_ip: 10.7.0.53
+  coredns_reverse_zones: 7.10.in-addr.arpa. 6.10.in-addr.arpa.
+  public_dns_service_ip: 10.7.0.6X  # X gets expanded to 0/1/2 for anycast/primary/secondary
+  public_internet_range: 147.189.207.128/26, 147.189.207.192/26
+  instance_host_router_range: "2a09:7007:14:1::/64"
+  number_of_core_router_pods: "3"
+  core_router_edge_a_link: enp175s0f0np0
+  core_router_edge_b_link: enp175s0f1np1
+  core_router_edge_a_ipv4: 147.189.207.2/28 147.189.207.3/28 147.189.207.4/28
+  core_router_edge_b_ipv4: 147.189.207.18/28 147.189.207.19/28 147.189.207.20/28
+
+  core_router_vipv4: 147.189.207.129/26 147.189.207.130/26 147.189.207.131/26 147.189.207.193/26 147.189.207.194/26 147.189.207.195/26
+  core_router_edge_a_ipv6: 2a09:7007:0:1::2/64 2a09:7007:0:1::3/64 2a09:7007:0:1::4/64
+  core_router_edge_b_ipv6: 2a09:7007:0:2::2/64 2a09:7007:0:2::3/64 2a09:7007:0:2::4/64
+  core_router_vipv6: 2a09:7007:14:0::1/64 2a09:7007:14:0::2/64 2a09:7007:14:0::3/64
+  core_router_fixed_ipv6: 2a09:7007:14:0::4/64 2a09:7007:14:0::5/64 2a09:7007:14:0::6/64
+  core_router_edge_peers_ipv4: 147.189.207.1 147.189.207.17
+  core_router_edge_peers_ipv6: 2a09:7007:0:1::1 2a09:7007:0:2::1
+  core_router_anycast_ipv4: 147.189.207.40, 147.189.207.41, 147.189.207.42
+  core_router_node_flow_ip1: 147.189.207.129/32
+  core_router_node_flow_ip2: 147.189.207.130/32
+  core_router_node_flow_ip3: 147.189.207.131/32
+  akvorado_pvc_size: 15Gi
+  service_anycast_ipv4: 147.189.207.40  # first IP from core_router_anycast_ipv4
+  ingress_anycast_ipv4: 147.189.207.41, 147.189.207.42  # last two IPs from core_router_anycast_ipv4
+  ingress_http_private: 10.7.0.7X  # X gets expanded later
+  ingress_private: 10.8.2.1
+  ingress_public: 147.189.207.254
+  ignition_server: "10.8.2.1:32266"
+  join_token_server: "10.8.2.1:31385"
+  ceph_pool_ssd: images-ssd
+  ceph_pool_ssd_data: images-ssd-data
+  ceph_pool_ssd_cluster: f45ffe08-864b-11ef-aa42-8930f34d6cfa
+  ceph_pool_hdd: images-hdd
+  ceph_pool_hdd_data: images-hdd-data
+  ceph_pool_hdd_cluster: f45ffe08-864b-11ef-aa42-8930f34d6cfa
+  ceph_pool_ssd2: images-ssd
+  ceph_pool_ssd2_data: images-ssd-data
+  ceph_pool_ssd2_cluster: f45ffe08-864b-11ef-aa42-8930f34d6cfa
+  ceph_monitoring_endpoints: '{ip: 10.8.5.2}, {ip: 10.8.5.4}, {ip: 10.8.5.6}'
+  etcd_certs_location: /etc/kubernetes/pki/etcd
+  etcd_backup_sc_name: "replicated2"
+  rook_ceph_nodes: '[{name: gc10-loki-control-plane}, {name: gc4-loki-control-plane}, {name: gc5-loki-control-plane}]'
+  e2e_tests_cron_inst_susp: '"false"'
+  e2e_tests_cron_sg_susp: '"false"'
+  e2e_tests_cron_vol_susp: '"false"'
+  placement_options: '''''''["A","B"]'''''''  # so it makes it successfully through all layers
+  infradev_librenms_ip: 10.9.9.17
+  infradev_flowmon_ip: 10.9.9.19
+  public_dns_zones: instance.euc-de-muc-1.genesiscloudusercontent.com. 207.189.147.in-addr.arpa. 0.7.0.0.7.9.0.a.2.ip6.arpa. euc-de-muc-1.gciprd.com.
+  akvorado_service_ip: 10.7.0.81
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeadm-config
+  namespace: kube-system
+data:
+  ClusterConfiguration: |
+    apiVersion: kubeadm.k8s.io/v1beta3
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        authorization-mode: Node,RBAC
+        feature-gates: APIServerTracing=true
+        tracing-config-file: /cfg/apiserver-tracing.yaml
+      extraVolumes:
+        - name: tracingcfg
+          hostPath: /opt/apiserver-tracing.yaml
+          mountPath: /cfg/apiserver-tracing.yaml
+          readOnly: true
+          pathType: File
+      timeoutForControlPlane: 4m0s
+    certificatesDir: /etc/kubernetes/pki
+    clusterName: kubernetes
+    controlPlaneEndpoint: 10.8.2.1:443
+    controllerManager:
+      extraArgs:
+        bind-address: 0.0.0.0
+      extraVolumes:
+        - name: flexvolume-dir
+          hostPath: /opt/kubernetes/kubelet-plugins/volume/exec
+          mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+          pathType: DirectoryOrCreate
+    dns: {}
+    etcd:
+      local:
+        dataDir: /var/lib/etcd
+        extraArgs:
+          listen-metrics-urls: http://0.0.0.0:2381
+          auto-compaction-mode: periodic
+          auto-compaction-retention: 15m
+    imageRepository: registry.k8s.io
+    kubernetesVersion: v1.29.8
+    networking:
+      dnsDomain: cluster.local
+      podSubnet: 10.6.0.0/16
+      serviceSubnet: 10.7.0.0/16
+    scheduler:
+      extraArgs:
+        bind-address: 0.0.0.0
+        config: /cfg/schedulerconfig.yaml
+      extraVolumes:
+        - name: cfg
+          hostPath: /opt/schedulerconfig.yaml
+          mountPath: /cfg/schedulerconfig.yaml
+          readOnly: true
+          pathType: File
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: e2e-tests
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: instance-specs
+  namespace: e2e-tests
+data:
+  LOG_LEVEL: INFO
+  cpu_nr: "4"
+  ram_gb: "12"
+  accel_type: habana.ai/gaudi2

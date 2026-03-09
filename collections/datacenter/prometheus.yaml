@@ -1,0 +1,214 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-operator-setup
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/upstream/setup
+  prune: true
+  wait: true
+  timeout: 10m0s
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-operator-main
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/upstream/main
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: prometheus-operator-setup
+      namespace: prometheus
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+      environment_flag_emoji: ${environment_flag_emoji}
+      prometheus_retention: 4w
+      prometheus_size: ${prometheus_size:=500Gi}
+      prometheus_class: replicated2
+      prometheus_replicas: '2'
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-base
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: prometheus
+  path: ./apps/prometheus/base
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: prometheus-operator-main
+      namespace: prometheus
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: node-monitoring
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: prometheus
+  path: ./apps/prometheus/node-monitoring
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: prometheus-operator-main
+      namespace: prometheus
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: grafana-configuration
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/grafana-configuration
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: prometheus-operator-main
+      namespace: prometheus
+    - name: terraform-controller
+      namespace: flux-system
+  postBuild:
+    substitute:
+      grafana_configuration: ${grafana_configuration:=0.3.0}
+      cluster_utilization_dashboard_config: |
+        ${cluster_utilization_dashboard_config}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: prometheus-pushgateway
+  namespace: prometheus
+spec:
+  interval: 6h
+  url: https://prometheus-community.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prometheus-pushgateway
+  namespace: prometheus
+spec:
+  targetNamespace: prometheus
+  releaseName: prometheus-pushgateway
+  interval: 60m
+  chart:
+    spec:
+      chart: prometheus-pushgateway
+      version: ">=2.0.0,<3.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-pushgateway
+        namespace: prometheus
+      interval: 10m
+  values:
+    podLabels:
+      b2.genesiscloud.dev/expose-to-prometheus: "true"
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+    serviceMonitor:
+      enabled: true
+      namespace: prometheus
+    networkPolicy:
+      allowAll: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: karma
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/karma
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: external-rook-ceph
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/external-rook-ceph-monitoring
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+      ceph_monitoring_endpoints: "[${ceph_monitoring_endpoints}]"
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: etcd-monitoring
+  namespace: flux-system
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/etcd-monitoring
+  prune: true
+  wait: true
+  timeout: 10m0s

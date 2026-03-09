@@ -1,0 +1,391 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    akvorado.service: akvorado-console
+  name: akvorado-console
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      akvorado.service: akvorado-console
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        akvorado.service: akvorado-console
+        b2.genesiscloud.dev/expose-to-ingress: "true"
+    spec:
+      containers:
+        - args:
+            - console
+            - http://akvorado-orchestrator:8080
+          env:
+            - name: AKVORADO_CFG_CONSOLE_DATABASE_DSN
+              value: /run/akvorado/console.sqlite
+          image: ghcr.io/akvorado/akvorado:main
+          name: akvorado-console
+          volumeMounts:
+            - mountPath: /run/akvorado
+              name: akvorado-console-db
+      restartPolicy: Always
+      volumes:
+        - name: akvorado-console-db
+          persistentVolumeClaim:
+            claimName: akvorado-console-db
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    akvorado.service: akvorado-inlet
+  name: akvorado-inlet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      akvorado.service: akvorado-inlet
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        akvorado.service: akvorado-inlet
+    spec:
+      containers:
+        - args:
+            - inlet
+            - http://akvorado-orchestrator:8080
+          env:
+            - name: AKVORADO_CFG_INLET_METADATA_CACHEPERSISTFILE
+              value: /run/akvorado/metadata.cache
+          image: ghcr.io/akvorado/akvorado:main
+          name: akvorado-inlet
+          ports:
+            - containerPort: 2055
+              protocol: UDP
+            - containerPort: 6343
+              protocol: UDP
+            - containerPort: 10179
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /run/akvorado
+              name: akvorado-run
+      restartPolicy: Always
+      volumes:
+        - name: akvorado-run
+          persistentVolumeClaim:
+            claimName: akvorado-run
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    akvorado.service: akvorado-orchestrator
+  name: akvorado-orchestrator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      akvorado.service: akvorado-orchestrator
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        akvorado.service: akvorado-orchestrator
+    spec:
+      containers:
+        - args:
+            - orchestrator
+            - /etc/akvorado/akvorado.yaml
+          image: ghcr.io/akvorado/akvorado:main
+          name: akvorado-orchestrator
+          volumeMounts:
+            - mountPath: /etc/akvorado
+              name: akvorado-orchestrator-cm0
+              readOnly: true
+            - mountPath: /usr/share/GeoIP
+              name: akvorado-geoip
+        - image: ipinfo/ipinfo-db:latest
+          name: akvorado-geoip
+          env:
+            - name: UPDATE_FREQUENCY
+              value: 48h
+            - name: IPINFO_DATABASES
+              value: country asn
+            - name: IPINFO_TOKEN
+              value: 0b4f8550adb0d7
+          volumeMounts:
+            - mountPath: /data
+              name: akvorado-geoip
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            name: akvorado-orchestrator-cm0
+          name: akvorado-orchestrator-cm0
+        - name: akvorado-geoip
+          persistentVolumeClaim:
+            claimName: akvorado-geoip
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    akvorado.service: clickhouse
+  name: clickhouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      akvorado.service: clickhouse
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        akvorado.service: clickhouse
+    spec:
+      containers:
+        - command:
+            - /entrypoint-override.sh
+          env:
+            - name: CLICKHOUSE_INIT_TIMEOUT
+              value: "60"
+            - name: CLICKHOUSE_SKIP_USER_SETUP
+              value: "1"
+          image: clickhouse/clickhouse-server:24.8
+          livenessProbe:
+            exec:
+              command:
+                - wget
+                - -T
+                - "1"
+                - --spider
+                - --no-proxy
+                - http://127.0.0.1:8123
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 10
+          name: clickhouse
+          securityContext:
+            capabilities:
+              add:
+                - SYS_NICE
+          volumeMounts:
+            - mountPath: /entrypoint-override.sh
+              name: clickhouse-cm0
+              readOnly: true
+              subPath: entrypoint-override.sh
+            - mountPath: /var/lib/clickhouse
+              name: akvorado-clickhouse
+            - mountPath: /etc/clickhouse-server/config.d/gc-tweaks.xml
+              name: clickhouse-tweaks
+              subPath: gc-tweaks.xml
+          ports:
+            - containerPort: 9000
+              protocol: TCP
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            defaultMode: 0777
+            items:
+              - key: docker-entrypoint.sh
+                path: entrypoint-override.sh
+            name: clickhouse-cm0
+          name: clickhouse-cm0
+        - configMap:
+            items:
+              - key: gc-tweaks.xml
+                path: gc-tweaks.xml
+            name: clickhouse-tweaks
+          name: clickhouse-tweaks
+        - name: akvorado-clickhouse
+          persistentVolumeClaim:
+            claimName: akvorado-clickhouse
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  labels:
+    akvorado.service: kafka
+  name: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      akvorado.service: kafka
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+      labels:
+        akvorado.service: kafka
+    spec:
+      containers:
+        - env:
+            - name: JMX_PORT
+              value: "5555"
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS
+              value: PLAINTEXT://kafka:9092
+            - name: KAFKA_CFG_DELETE_TOPIC_ENABLE
+              value: "true"
+            - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
+              value: PLAINTEXT
+            - name: KAFKA_CFG_LISTENERS
+              value: PLAINTEXT://:9092
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+              value: PLAINTEXT:PLAINTEXT
+            - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+              value: zookeeper:2181
+            - name: KAFKA_ZOOKEEPER_PROTOCOL
+              value: PLAINTEXT
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx2048m -Xms2048m"
+          image: bitnami/kafka:3.7
+          livenessProbe:
+            exec:
+              command:
+                - env
+                - -u
+                - JMX_PORT
+                - kafka-topics.sh
+                - --list
+                - --bootstrap-server
+                - kafka:9092
+            failureThreshold: 3
+            periodSeconds: 20
+            timeoutSeconds: 10
+            initialDelaySeconds: 180
+          name: kafka
+          volumeMounts:
+            - mountPath: /bitnami/kafka
+              name: akvorado-kafka
+      restartPolicy: Always
+      volumes:
+        - name: akvorado-kafka
+          persistentVolumeClaim:
+            claimName: akvorado-kafka
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      securityContext:
+        fsGroup: 0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  labels:
+    akvorado.service: redis
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      akvorado.service: redis
+  template:
+    metadata:
+      annotations:
+      labels:
+        akvorado.service: redis
+    spec:
+      containers:
+        - env:
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "yes"
+          image: bitnami/valkey:7.2
+          livenessProbe:
+            exec:
+              command:
+                - timeout 3 redis-cli ping | grep -q PONG
+            failureThreshold: 3
+            periodSeconds: 20
+            timeoutSeconds: 10
+          name: redis
+      restartPolicy: Always
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  labels:
+    akvorado.service: zookeeper
+  name: zookeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      akvorado.service: zookeeper
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+      labels:
+        akvorado.service: zookeeper
+    spec:
+      containers:
+        - env:
+            - name: ALLOW_ANONYMOUS_LOGIN
+              value: "yes"
+            - name: ZOO_4LW_COMMANDS_WHITELIST
+              value: srvr,mntr,ruok
+            - name: ZOO_ENABLE_PROMETHEUS_METRICS
+              value: "yes"
+            - name: ZOO_HEAP_SIZE
+              value: "2048"
+            - name: ZOO_TICK_TIME
+              value: "10000"
+            - name: ZOO_SYNC_LIMIT
+              value: "10"
+          image: bitnami/zookeeper:3.8
+          livenessProbe:
+            exec:
+              command:
+                - echo ruok | nc -w3 127.0.0.1 2181 | grep -xFq imok
+            failureThreshold: 3
+            periodSeconds: 20
+            timeoutSeconds: 10
+          name: zookeeper
+          ports:
+            - containerPort: 2181
+              protocol: TCP
+            - containerPort: 2888
+              protocol: TCP
+            - containerPort: 3888
+              protocol: TCP
+            - containerPort: 7000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /bitnami/zookeeper
+              name: akvorado-zookeeper
+      restartPolicy: Always
+      volumes:
+        - name: akvorado-zookeeper
+          persistentVolumeClaim:
+            claimName: akvorado-zookeeper
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      securityContext:
+        fsGroup: 0

@@ -1,0 +1,66 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: kamaji
+  namespace: kamaji-system
+spec:
+  interval: 72h
+  url: https://github.com/clastix/kamaji
+  ref:
+    tag: edge-25.7.5
+  ignore: |
+    # exclude all
+    /*
+    # include charts
+    !/charts/kamaji
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kamaji
+  namespace: kamaji-system
+spec:
+  targetNamespace: kamaji-system
+  releaseName: kamaji
+  interval: 60m
+  chart:
+    spec:
+      chart: charts/kamaji
+      sourceRef:
+        kind: GitRepository
+        name: kamaji
+        namespace: kamaji-system
+      interval: 10m
+  postRenderers:
+    - kustomize:
+        patches:
+          - patch: |-
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: kamaji
+                namespace: kamaji-system
+              spec:
+                template:
+                  metadata:
+                    labels:
+                      b2.genesiscloud.dev/expose-to-prometheus: "true"
+  values:
+    resources:
+      limits:
+        memory: 1Gi
+    readinessProbe:
+      initialDelaySeconds: 60
+    livenessProbe:
+      initialDelaySeconds: 120
+    kamaji-etcd:
+      deploy: false
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+    serviceMonitor:
+      enabled: true
+      namespace: prometheus
+    telemetry:
+      disabled: true

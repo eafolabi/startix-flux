@@ -1,0 +1,50 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-kamaji-to-postgres
+  namespace: kamaji-system
+spec:
+  selector: cnpg.io/cluster == 'kamaji-postgres'
+  types:
+    - Ingress
+    - Egress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: cnpg.io/cluster == 'kamaji-postgres'
+      destination:
+        ports:
+          - 5432
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app.kubernetes.io/name == 'kamaji'
+      destination:
+        ports:
+          - 5432
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: cnpg.io/cluster == 'kamaji-postgres'
+        ports:
+          - 5432
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-kamaji-egress
+  namespace: kamaji-system
+spec:
+  selector: app.kubernetes.io/name == 'kamaji'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: cnpg.io/cluster == 'kamaji-postgres'
+        ports:
+          - 5432

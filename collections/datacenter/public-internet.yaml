@@ -1,0 +1,22 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: public-internet
+  namespace: flux-system
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/public-internet
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: multus
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-config

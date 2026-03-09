@@ -1,0 +1,138 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vast
+  namespace: noc
+spec:
+  ports:
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: vast
+  namespace: noc
+subsets:
+  - addresses:
+      - ip: ${vast_api_ip}
+    ports:
+      - port: 443
+        protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  name: vast
+  namespace: noc
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: vast.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - backend:
+              service:
+                name: vast
+                port:
+                  number: 443
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - vast.${environment}.b2.${base_domain}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vast-s3
+  namespace: noc
+spec:
+  ports:
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: vast-s3
+  namespace: noc
+subsets:
+  - addresses:
+      - ip: 10.24.11.10
+      - ip: 10.24.11.11
+      - ip: 10.24.11.12
+      - ip: 10.24.11.13
+      - ip: 10.24.11.14
+      - ip: 10.24.11.15
+      - ip: 10.24.11.16
+      - ip: 10.24.11.17
+      - ip: 10.24.11.18
+      - ip: 10.24.11.19
+      - ip: 10.24.11.20
+      - ip: 10.24.11.21
+      - ip: 10.24.11.22
+      - ip: 10.24.11.23
+      - ip: 10.24.11.24
+      - ip: 10.24.11.25
+      - ip: 10.24.11.26
+      - ip: 10.24.11.27
+      - ip: 10.24.11.28
+      - ip: 10.24.11.29
+      - ip: 10.24.11.30
+      - ip: 10.24.11.31
+      - ip: 10.24.11.32
+      - ip: 10.24.11.33
+      - ip: 10.24.11.34
+      - ip: 10.24.11.35
+      - ip: 10.24.11.36
+      - ip: 10.24.11.37
+      - ip: 10.24.11.38
+      - ip: 10.24.11.39
+      - ip: 10.24.11.40
+      - ip: 10.24.11.41
+      - ip: 10.24.11.42
+      - ip: 10.24.11.43
+      - ip: 10.24.11.44
+      - ip: 10.24.11.45
+      - ip: 10.24.11.46
+      - ip: 10.24.11.47
+      - ip: 10.24.11.48
+    ports:
+      - port: 443
+        protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  name: vast-s3
+  namespace: noc
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: vast-s3.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - backend:
+              service:
+                name: vast-s3
+                port:
+                  number: 443
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - vast-s3.${environment}.b2.${base_domain}

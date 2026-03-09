@@ -1,0 +1,42 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: rdma-network-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-rdma-network-operator/rdma-network-operator-flux
+  insecure: true
+  ref:
+    tag: ${rdma_network_operator_flux:=0.1.0}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: rdma-network-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: rdma-network-operator
+  targetNamespace: customer-operators
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      ufm_ip: ${ufm_address:=192.0.2.0}
+  patches:
+    - patch: |
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: not-used
+        spec:
+          replicas: ${rdma_network_operator_replicas:=0}
+      target:
+        kind: Deployment
+        labelSelector: "app=rdma-network-operator"

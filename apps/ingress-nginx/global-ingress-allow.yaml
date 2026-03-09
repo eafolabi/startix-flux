@@ -1,0 +1,16 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: global-ingress-allow
+spec:
+  selector: b2.genesiscloud.dev/expose-to-ingress == 'true'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        services:
+          name: ingress-nginx-controller
+          namespace: ingress

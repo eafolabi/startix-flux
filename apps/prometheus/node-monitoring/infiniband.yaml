@@ -1,0 +1,20 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: infiniband
+  namespace: prometheus
+spec:
+  groups:
+    - name: infiniband.rules
+      rules:
+        - alert: InfinibandLinkDown
+          expr: |
+            rate(node_infiniband_link_downed_total[30m]) != 0
+          labels:
+            severity: error
+          annotations:
+            summary: An Infiniband link went down
+            description: |
+              The Infiniband device `{{ $labels.device }}` in host `{{ $labels.instance }}` went down in the last 30mins
+              Please check "cat /sys/class/infiniband/*/ports/*/phys_state"

@@ -1,0 +1,28 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-cluster-utilization
+spec:
+  selector: app == 'cluster-utilization'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: b2.genesiscloud.dev/allow-to-cluster-utilization == 'true'
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-cluster-utilization-egress
+spec:
+  selector: b2.genesiscloud.dev/allow-to-cluster-utilization == 'true'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'cluster-utilization'

@@ -1,0 +1,20 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-json-exporter
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: prometheus
+  path: ./apps/prometheus-json-exporter
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      ufm_address: ${ufm_address:=192.0.2.0}

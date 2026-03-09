@@ -1,0 +1,57 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-rook-internal
+spec:
+  selector: all()
+  ingress:
+    - action: Allow
+      source:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "rook-ceph"
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 3300
+          - 6789
+          - 6800:7300
+  egress:
+    - action: Allow
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "rook-ceph"
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: kubernetes
+          namespace: default
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-rook-rgw
+spec:
+  selector: app.kubernetes.io/name == 'ceph-rgw'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 8080
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-rook-rgw
+spec:
+  selector: b2.genesiscloud.dev/allow-to-rook-rgw == 'true'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app.kubernetes.io/name == 'ceph-rgw'
+        ports:
+          - 8080

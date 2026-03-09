@@ -1,0 +1,15 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-external-rook-ceph
+  namespace: external-prometheus
+spec:
+  selector: app == 'external-rook-ceph'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: external-rook-ceph
+          namespace: external-prometheus

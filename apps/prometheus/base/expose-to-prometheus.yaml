@@ -1,0 +1,30 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-to-scrape-target
+  namespace: prometheus
+spec:
+  selector: app.kubernetes.io/component == "prometheus"
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      destination:
+        namespaceSelector: all()
+        selector: b2.genesiscloud.dev/expose-to-prometheus == 'true'
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-from-prometheus
+spec:
+  selector: b2.genesiscloud.dev/expose-to-prometheus == 'true'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "prometheus"
+        selector: app.kubernetes.io/component == "prometheus"

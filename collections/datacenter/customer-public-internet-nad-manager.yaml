@@ -1,0 +1,32 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: customer-public-internet-nad-manager
+  namespace: customer-network
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-customer-public-internet-nad-manager/customer-public-internet-nad-manager-flux
+  insecure: true
+  ref:
+    tag: ${customer_public_internet_nad_manager_flux:=0.1.0}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: customer-public-internet-nad-manager
+  namespace: customer-network
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: customer-public-internet-nad-manager
+    namespace: customer-network
+  targetNamespace: customer-network
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      public_internet_range: ${public_internet_range}

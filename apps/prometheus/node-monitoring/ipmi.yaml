@@ -1,0 +1,134 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: ipmi-exporter
+  name: ipmi-exporter
+spec:
+  selector:
+    matchLabels:
+      app: ipmi-exporter
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 100%
+  template:
+    metadata:
+      labels:
+        app: ipmi-exporter
+        b2.genesiscloud.dev/expose-to-prometheus: "true"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: b2.genesiscloud.dev/no-ipmi
+                    operator: DoesNotExist
+      containers:
+        # yamllint disable-line rule:line-length
+        - image: ghcr.io/gc-private/ipmi_exporter:v1.8.0
+          name: ipmi-exporter
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - mountPath: /sys
+              mountPropagation: HostToContainer
+              name: sys
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+              smarter-devices/ipmi0: 1
+            limits:
+              cpu: 200m
+              memory: 250Mi
+              smarter-devices/ipmi0: 1
+          ports:
+            - containerPort: 9290
+              hostPort: 9290
+              name: http
+          livenessProbe:
+            timeoutSeconds: 60
+            httpGet:
+              path: /health
+              port: 9290
+          readinessProbe:
+            timeoutSeconds: 60
+            httpGet:
+              path: /health
+              port: 9290
+      volumes:
+        - hostPath:
+            path: /sys
+          name: sys
+      tolerations:
+        - key: gpu-host
+          operator: Exists
+        - key: cpu-host
+          operator: Exists
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ipmi-exporter
+  name: ipmi-exporter
+spec:
+  ports:
+    - name: ipmi-exporter
+      port: 9290
+      protocol: TCP
+      targetPort: 9290
+  selector:
+    app: ipmi-exporter
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: ipmi-exporter
+  name: ipmi-exporter
+spec:
+  selector:
+    matchLabels:
+      app: ipmi-exporter
+  endpoints:
+    - port: ipmi-exporter
+      interval: 15s
+      relabelings:
+        - action: replace
+          regex: (.*)
+          replacement: $1
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: instance
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ipmi-exporter
+  namespace: prometheus
+spec:
+  groups:
+    - name: ipmi-exporter.rules
+      rules:
+        - alert: PSUisUnexpectedlyWarning
+          expr: |
+            ipmi_sensor_state{type="Power Supply"} == 1
+          labels:
+            severity: warning
+          annotations:
+            summary: PSUs are reporting a warning
+            description: >
+              The PSU `{{ $labels.name }}` in host `{{ $labels.instance }}` show status {{ $value }}.
+        - alert: PSUisUnexpectedlyBroken
+          expr: |
+            ipmi_sensor_state{type="Power Supply"} == 2
+          labels:
+            severity: critical
+          annotations:
+            summary: PSUs are reporting an error
+            description: >
+              The PSU `{{ $labels.name }}` in host `{{ $labels.instance }}` show status {{ $value }}.

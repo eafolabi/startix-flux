@@ -1,0 +1,103 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dnsmasq
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dnsmasq
+  template:
+    metadata:
+      labels:
+        app: dnsmasq
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      volumes:
+        - name: dnsmasq-leases
+          persistentVolumeClaim:
+            claimName: dnsmasq-leases
+      containers:
+        - name: dnsmasq
+          image: 4km3/dnsmasq:2.90-r3-alpine-latest
+          command:
+            - /usr/sbin/dnsmasq
+            - --keep-in-foreground
+            - --dhcp-ignore-clid  # needed only duing control plane deployment
+            - --dhcp-ignore-name  # needed only duing control plane deployment
+            - --dhcp-range=${l2_underlay_dhcp_range_start_ip},${l2_underlay_dhcp_range_end_ip},48h
+            - --dhcp-option=1,${l2_underlay_netmask}
+            - --dhcp-option=3,${l2_underlay_gw_ip}
+            - --dhcp-option=6,${kubedns_service_ip}
+            - --dhcp-option=33,${l2_underlay_network},${l2_underlay_gw_ip}
+            - --dhcp-option=66,${pxe_dhcp_service_ip}
+            - --log-dhcp
+            - --log-facility=-
+            - --dhcp-userclass=set:IPXEBOOT,iPXE
+            - --dhcp-vendorclass=set:UEFIPXE,PXEClient:Arch:00007
+            - --dhcp-vendorclass=set:UEFIHTTP,HTTPClient:Arch:00016
+            - --dhcp-boot=tag:!IPXEBOOT,tag:!UEFIHTTP,tag:!UEFIPXE,${pxe_dhcp_service_ip},${pxe_dhcp_service_ip}
+            - --dhcp-boot=tag:UEFIPXE,x86-snponly.efi,${pxe_dhcp_service_ip},${pxe_dhcp_service_ip}
+            - --dhcp-boot=tag:IPXEBOOT,http://${ignition_server}/config/$${netX/mac}/boot.ipxe
+            - --dhcp-boot=tag:UEFIHTTP,http://${ignition_server}/config/$${netX/mac}/boot.efi
+            # Legacy BIOS with PXE, more tag filtering needed and mainly unused on contractor cloud due to UEFI
+            # - --dhcp-boot=tag:!IPXEBOOT,x86-undionly.kpxe,${pxe_dhcp_service_ip},${pxe_dhcp_service_ip}
+          volumeMounts:
+            - mountPath: /var/lib/misc
+              name: dnsmasq-leases
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: dnsmasq
+  name: dnsmasq
+spec:
+  clusterIP: ${dnsmasq_service_ip}
+  ports:
+    - name: dnsmasq
+      port: 67
+      protocol: UDP
+      targetPort: 67
+  selector:
+    app: dnsmasq
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-dnsmasq
+spec:
+  selector: app == 'dnsmasq'
+  ingress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports:
+          - 67
+  egress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports:
+          - 67
+  types:
+    - Ingress
+    - Egress
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dnsmasq-leases
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Mi
+  storageClassName: fs-replicated2

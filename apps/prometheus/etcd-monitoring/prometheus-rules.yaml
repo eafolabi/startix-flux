@@ -1,0 +1,104 @@
+---
+# yamllint disable rule:line-length
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: etcd-metrics-rules
+  namespace: prometheus
+spec:
+  groups:
+    - name: "etcd DB"
+      rules:
+        - alert: "ETCDDatabaseLowFreeSpace"
+          expr: "(etcd_mvcc_db_total_size_in_use_in_bytes/2147483648) * 100 > 90"
+          for: "5m"
+          labels:
+            severity: "critical"
+          annotations:
+            summary: "etcd database is running very low on space"
+            description: "The etcd database is running low on space ({{ $value | humanize }}% used). This may cause etcd to fail to write data."
+
+        - alert: "HighETCDDBGrowth"
+          # growing rate alert is set to 10MiB/s since we have seen etcd growth rate of 2MiB/s in normal operation
+          expr: "rate(etcd_mvcc_db_total_size_in_use_in_bytes[5m]) / (1024^2) > 10"
+          for: "5m"
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "etcd database is growing at a high rate"
+            description: "The etcd database is growing at a high rate ({{ $value | humanize }}MiB/s growth in the last 5 minutes)"
+
+    - name: "etcd cluster"
+      rules:
+        - alert: EtcdNoLeader
+          expr: etcd_server_has_leader == 0
+          for: 5m
+          labels:
+            severity: "critical"
+          annotations:
+            summary: "No leader in etcd cluster"
+            description: "The etcd cluster does not have a leader."
+
+        - alert: LowFileDescriptor
+          expr: process_open_fds / process_max_fds > 0.9
+          for: 5m
+          labels:
+            severity: "critical"
+          annotations:
+            summary: "Low etcd file descriptors"
+            description: "The etcd file descriptor usage is very high ({{ $value | humanize }}% used). This may cause etcd to panic."
+
+        - alert: HighMemoryUsage
+          # we set the threshold to 4GiB since normal memory usage is around 2GiB
+          expr: process_resident_memory_bytes{service="etcd-metrics"} / 1024^3 > 4
+          for: 5m
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "High etcd memory usage"
+            description: "The etcd memory usage is very high ({{ $value | humanize }}GiB used). This may cause etcd to panic."
+
+        - alert: HighEtcdStoreWatchers
+          expr: etcd_debugging_store_watchers > 100
+          for: 5m
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "High number of etcd watchers"
+            description: "The number of etcd watchers has exceeded 100. Current value: {{ $value }}"
+
+        - alert: EtcdSlowWatchers
+          expr: increase(etcd_debugging_mvcc_slow_watcher_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "Slow etcd watchers detected"
+            description: "One or more slow watchers have been detected in the last 5 minutes. Current count: {{ $value }}"
+
+        - alert: FrequentEtcdLeaderChanges
+          expr: increase(etcd_server_leader_changes_seen_total[1h]) > 3
+          for: 10m
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "Frequent etcd leader changes"
+            description: "The etcd cluster has experienced more than 3 leader changes in the last hour. Current count: {{ $value }}"
+
+        - alert: HighEtcdPeerRoundTripTime
+          expr: histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "High etcd peer round-trip time"
+            description: "The 99th percentile network peer round-trip time is above 100ms over the last 5 minutes. Current value: {{ $value }}s"
+
+        - alert: HighEtcdWALFsyncDuration
+          expr: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "High etcd WAL fsync duration"
+            description: "The 99th percentile etcd WAL fsync duration is above 50ms over the last 5 minutes. Current value: {{ $value }}s"

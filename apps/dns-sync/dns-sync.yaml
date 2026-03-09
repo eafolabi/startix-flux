@@ -1,0 +1,134 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: dns-sync
+  name: dns-sync
+  namespace: infra
+spec:
+  schedule: "0,15,30,45 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: dns-sync
+            b2.genesiscloud.dev/allow-to-apiserver: "true"
+        spec:
+          serviceAccountName: dns-sync
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+          volumes:
+            - name: netbox-key
+              secret:
+                secretName: netbox-key
+                defaultMode: 256  # 0400
+          containers:
+            - name: dns-sync
+              image: nixery.dev/shell/curl/openssh/jq/gnused/kubectl
+              volumeMounts:
+                - mountPath: /run/secrets/netbox-key
+                  name: netbox-key
+              command:
+                - bash
+                - -eEuc
+                - |
+                  # SSH complains without this
+                  echo 'root:x:0:0::/root:/bin/bash' > /etc/passwd
+
+                  # Copy the static inventory
+                  mkdir /etc/inventory
+
+                  # Establish SSH connection to Netbox VM
+                  sshUser=$(cat /run/secrets/netbox-key/userName)
+                  sshHost=$(cat /run/secrets/netbox-key/hostName)
+                  ssh -f -N -M -S /run/ssh \
+                      -L 9000:localhost:9000 \
+                      -i /run/secrets/netbox-key/sshKey \
+                      -o StrictHostKeyChecking=no \
+                       $sshUser@$sshHost
+
+                  # Launch Netbox script job
+                  netboxToken=$(cat /run/secrets/netbox-key/netboxToken)
+                  netboxSite=$(cat /run/secrets/netbox-key/netboxSite)
+                  resultURL=$(curl --insecure --fail -X POST \
+                      -s "http://localhost:9000/api/extras/scripts/GenerateB2DNSZone.GenerateB2DNSZone/" \
+                      -H "Authorization: Token $netboxToken" \
+                      -H "Content-Type: application/json" \
+                      -H "Accept: application/json; indent=4" \
+                      --data "{\"data\":{\"site\":\"$netboxSite\",\"config_type\":\"public_zone\"},\"commit\":false}" \
+                    | jq -r .result.url \
+                    | sed 's|.*/api/|http://localhost:9000/api/|')
+
+                  # Wait for Job to be complete
+                  for _ in $(seq 0 5)
+                  do
+                      curl --insecure --fail -X GET -H "Authorization: Token $netboxToken" "$resultURL" \
+                        | jq -r 'select(.status.value = "completed") | .data.output' > /etc/inventory/netbox.yaml
+                      [[ "$(cat /etc/inventory/netbox.yaml)" != "null" ]] && break || sleep 5
+                  done
+
+                  # Ensure we got a valid result
+                  [[ -n "$(cat /etc/inventory/netbox.yaml)" && "$(cat /etc/inventory/netbox.yaml)" != "null" ]]
+                  if [ "$(head -n 1 /etc/inventory/netbox.yaml)" != "---" ]; then
+                    echo --- | cat - /etc/inventory/netbox.yaml > /tmp/netbox.yaml
+                    mv /tmp/netbox.yaml /etc/inventory/netbox.yaml
+                  fi
+
+                  # Close SSH tunnel
+                  ssh -S /run/ssh -O exit foo
+
+                  # Update ConfigMap
+                  kubectl create configmap -n customer-operators dns-inventory \
+                    --from-file=/etc/inventory/ -o yaml --dry-run=client \
+                    | kubectl replace -f -
+          restartPolicy: OnFailure
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-sync
+  namespace: infra
+spec:
+  selector: app == 'dns-sync'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:  # Needs to connect the Netbox instance via SSH
+          - 22
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dns-sync
+  namespace: customer-operators
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - update
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dns-sync
+  namespace: infra
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dns-sync
+  namespace: customer-operators
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dns-sync
+subjects:
+  - kind: ServiceAccount
+    name: dns-sync
+    namespace: infra

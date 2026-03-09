@@ -1,0 +1,39 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: e2e-tests-operator
+  namespace: e2e-tests
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-e2e-tests-operator/b2-docker-image-e2e-tests-operator-flux
+  insecure: true
+  ref:
+    tag: ${e2e_tests_operator_flux:=0.3.1}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: e2e-tests-operator
+  namespace: e2e-tests
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: e2e-tests-operator
+  targetNamespace: e2e-tests
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      cron_inst_susp: ${e2e_tests_cron_inst_susp}
+      cron_sg_susp: ${e2e_tests_cron_sg_susp}
+      cron_vol_susp: ${e2e_tests_cron_vol_susp}
+      # yamllint disable-line rule:line-length
+      lib_url: ghcr.io/gc-private/b2-docker-image-e2e-tests/b2-docker-image-e2e-tests:${e2e_tests:=0.5.5}
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

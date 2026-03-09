@@ -1,0 +1,34 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: wave
+  namespace: wave
+spec:
+  interval: 60m
+  url: https://wave-k8s.github.io/wave/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wave
+  namespace: wave
+spec:
+  targetNamespace: wave
+  releaseName: wave
+  interval: 60m
+  chart:
+    spec:
+      chart: wave
+      version: ">=4.4.1 <5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: wave
+        namespace: wave
+      interval: 60m
+  values:
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+    podLabels:
+      b2.genesiscloud.dev/allow-to-apiserver: "true"

@@ -1,0 +1,259 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dhcp-pxe
+  namespace: infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dhcp-pxe
+  template:
+    metadata:
+      labels:
+        app: dhcp-pxe
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      volumes:
+        - name: tftp
+          emptyDir: {}
+        - name: tftp-config
+          configMap:
+            name: tftp-config
+      initContainers:
+        - name: download-ipxe
+          # rationale for nixery: there is a ticket in place to remove this
+          image: nixery.dev/shell/curl
+          volumeMounts:
+            - mountPath: /var/tftpboot
+              name: tftp
+          command:
+            - bash
+            - -eEuc
+            - |
+              cd /var/tftpboot
+              curl -JLo x86-undionly.kpxe https://boot.ipxe.org/undionly.kpxe
+              curl -JLo x86-snponly.efi https://boot.ipxe.org/snponly.efi
+              curl -JLo arm-snponly.efi https://boot.ipxe.org/arm64-efi/snponly.efi
+      containers:
+        - name: dhcp
+          # rationale for nixery: there is a ticket in place to remove this
+          image: nixery.dev/python311/python311packages.scapy
+          env:
+            - name: PYTHONPATH
+              value: /lib/python3.11/site-packages/
+            - name: DHCP_IP
+              value: ${pxe_dhcp_service_ip}
+            - name: TFTP_IP
+              value: ${pxe_dhcp_service_ip}
+            - name: DNS_IP
+              value: ${kubedns_service_ip}
+            - name: IPXE_BOOT_FILE
+              value: http://${ignition_server}/config/$${netX/mac}/boot.ipxe
+            - name: HTTP_BOOT_FILE
+              value: http://${ignition_server}/config/<MAC>/boot.efi
+          command:
+            - python3
+            - -c
+            - |
+              import socket
+              import logging
+              import ipaddress
+              import os
+              from scapy.layers.dhcp import DHCP, BOOTP
+
+              DHCP_IP = os.environ['DHCP_IP']
+              TFTP_IP = os.environ['TFTP_IP']
+              DNS_IP = os.environ['DNS_IP']
+
+              IPXE_BOOT_FILE = os.environ['IPXE_BOOT_FILE']
+              HTTP_BOOT_FILE = os.environ['HTTP_BOOT_FILE']
+              X86_EFI_BOOT_FILE = 'x86-snponly.efi'
+              X86_BIOS_BOOT_FILE = 'x86-undionly.kpxe'
+              ARM_EFI_BOOT_FILE = 'arm-snponly.efi'
+
+              log = logging.Logger('dhcp')
+              log.setLevel('INFO')
+
+
+              def parseIPXE(data: bytes) -> dict:
+                  options = {}
+                  while data:
+                      type = int(data[0])
+                      data = data[1:]
+                      if type in [0, 255]:
+                          continue
+                      if not data:
+                          options[type] = None
+                          break
+                      length = int(data[0])
+                      data = data[1:]
+                      if len(data) < length:
+                          break
+                      options[type] = data[0:length]
+                      data = data[length:]
+                  return options
+
+
+              def iPXESupportsKernel(data: bytes) -> bool:
+                options = parseIPXE(data)
+                if options.get(24) == bytes([1]):
+                  return True  # bzImage
+                if options.get(36) == bytes([1]):
+                  return True  # EFI
+                return False
+
+
+              sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+              sock.bind(('0.0.0.0', 67))
+              while True:
+                  data, src = sock.recvfrom(65535)
+                  if len(data) < 244:   # Minimal length for BOOTP + DHCP type + end
+                      continue
+                  pkt = BOOTP(data)
+                  if pkt.op != 1:
+                      continue
+                  if pkt.giaddr == '0.0.0.0':
+                      continue
+                  if not pkt.haslayer(DHCP):
+                      continue
+                  dhcp = pkt[DHCP]
+                  options = {option[0]: option[1] for option in dhcp.options if isinstance(option, tuple)}
+                  if options.get('message-type') == 4:
+                      log.warning(f"Received DHCPDECLINE")
+                      continue
+                  if options.get('message-type') not in [1, 3]:
+                      continue
+
+                  gatewayAddr = ipaddress.IPv4Address(pkt.giaddr)
+                  #assert int(gatewayAddr) & 1 == 0
+                  peerAddr = str(gatewayAddr + 1)
+
+                  out_bootp = pkt.copy()
+                  out_bootp.op = 2
+                  out_bootp.yiaddr = peerAddr
+                  out_bootp.siaddr = DHCP_IP
+                  out_bootp.ciaddr = '0.0.0.0'
+                  out_bootp.giaddr = pkt.giaddr
+                  del out_bootp.payload
+
+                  out_options = {'server_id': DHCP_IP}
+                  if options.get('message-type') == 1:
+                      out_options['message-type'] = 2
+                  elif options.get('message-type') == 3:
+                      if options.get('requested_addr') == peerAddr:
+                          out_options['message-type'] = 5
+                      else:
+                          out_options['message-type'] = 6
+                  else:
+                      assert False
+
+                  if out_options['message-type'] != 6:
+                      out_options['lease_time'] = 600
+                      out_options['renewal_time'] = 300
+                      out_options['rebinding_time'] = 500
+                      out_options['subnet_mask'] = '255.255.255.252'
+                      out_options['router'] = pkt.giaddr
+                      out_options['name_server'] = DNS_IP
+                      out_options['tftp_server_name'] = TFTP_IP
+
+                      if 67 in options.get('param_req_list', []):
+                          if options.get(175) and iPXESupportsKernel(options[175]):
+                              out_options['boot-file-name'] = IPXE_BOOT_FILE
+                          elif 'pxe_client_architecture' in options:
+                              # https://www.iana.org/assignments/dhcpv6-parameters/dhcpv6-parameters.xhtml#processor-architecture
+                              clientArch = int.from_bytes(options['pxe_client_architecture'], byteorder='big')
+                              if clientArch in [6, 7, 9]:
+                                  out_options['boot-file-name'] = X86_EFI_BOOT_FILE
+                              elif clientArch == 11:
+                                  out_options['boot-file-name'] = ARM_EFI_BOOT_FILE
+                              elif clientArch == 0:
+                                  out_options['boot-file-name'] = X86_BIOS_BOOT_FILE
+                              elif clientArch in [16, 19]:
+                                  mac = pkt.chaddr[0:6].hex()
+                                  file = HTTP_BOOT_FILE.replace('<MAC>', mac)
+                                  out_options['boot-file-name'] = file
+                                  out_options['vendor_class_id'] = b'HTTPClient'
+                              else:
+                                  log.warning(f"Failed to identify boot file name, unknown architecture ({clientArch})")
+                          else:
+                              log.warning(f"Failed to identify boot file name, unknown architecture")
+
+                  log.info(f"Sending IP {peerAddr} to client {pkt.chaddr[0:6].hex()}")
+                  out_dhcp = DHCP(options=[(key, value) for key, value in out_options.items()] + ['end'])
+                  sock.sendto(bytes(out_bootp / out_dhcp), src)
+        - name: tftp
+          # rationale for nixery: there is a ticket in place to remove this
+          image: nixery.dev/dnsmasq
+          command:
+            - dnsmasq
+            - -k
+            - --port=0
+            - --enable-tftp
+            - --tftp-root=/var/tftpboot
+            - --tftp-no-blocksize
+            - --tftp-single-port
+          volumeMounts:
+            - mountPath: /var/tftpboot
+              name: tftp
+            - name: tftp-config
+              mountPath: /etc/passwd
+              subPath: passwd
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tftp-config
+  namespace: infra
+  labels:
+    app: dhcp-pxe
+data:
+  passwd: |
+    root:x:0:0::/:/usr/bin/nologin
+    nobody:x:65534:65534::/:/usr/bin/nologin
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: dhcp-pxe
+  name: dhcp-pxe
+  namespace: infra
+spec:
+  clusterIP: ${pxe_dhcp_service_ip}
+  ports:
+    - name: dhcp-pxe
+      port: 67
+      protocol: UDP
+      targetPort: 67
+    - name: tftp
+      port: 69
+      protocol: UDP
+      targetPort: 69
+  selector:
+    app: dhcp-pxe
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-dhcp-pxe
+  namespace: infra
+spec:
+  selector: app == 'dhcp-pxe'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports: # downloads iPXE binaries, TODO remove this and build image? https://genesiscloud.atlassian.net/browse/B2-605
+          - 80
+          - 443
+  ingress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports:
+          - 67
+          - 69

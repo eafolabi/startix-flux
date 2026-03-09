@@ -1,0 +1,117 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  interval: 30m
+  url: https://helm.goharbor.io
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  targetNamespace: harbor
+  releaseName: harbor
+  interval: 60m
+  # Use higher timeout here since pulling containers can take a long time when Harbor is down
+  timeout: 15m
+  chart:
+    spec:
+      chart: harbor
+      version: 1.13.2
+      sourceRef:
+        kind: HelmRepository
+        name: harbor
+        namespace: harbor
+      interval: 60m
+  values:
+    externalURL: http://harbor.harbor.svc.cluster.local
+    expose:
+      type: clusterIP
+      tls:
+        enabled: false
+    persistence:
+      persistentVolumeClaim:
+        registry:
+          storageClass: ${storageClass}
+          size: 50Gi
+        jobservice:
+          jobLog:
+            storageClass: ${storageClass}
+          scanDataExports:
+            storageClass: ${storageClass}
+        database:
+          storageClass: ${storageClass}
+        redis:
+          storageClass: ${storageClass}
+    updateStrategy:
+      type: Recreate
+    nginx:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    portal:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    core:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    jobservice:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    registry:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    chartmuseum:
+      enabled: false
+    trivy:
+      enabled: false
+    notary:
+      enabled: false
+    database:
+      internal:
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+    redis:
+      internal:
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+    exporter:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+  postRenderers:
+    - kustomize:
+        patches:
+          - patch: |
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: harbor-nginx
+              spec:
+                template:
+                  metadata:
+                    labels:
+                      b2.genesiscloud.dev/expose-to-ingress: 'true'
+          - patch: |
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: harbor-core
+              data:
+                PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE:
+                  docker-hub,harbor,azure-acr,aws-ecr,google-gcr,quay,docker-registry,github-ghcr

@@ -1,0 +1,39 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-rgw
+spec:
+  selector: app == 'rgw'
+  types:
+    - Egress
+    - Ingress
+  egress:
+    - action: Allow
+      destination:
+        nets:
+          - 10.26.0.0/16  # Norway Ceph cluster
+          - 10.8.5.0/24 # emc ceph cluster
+        ports:
+          - 3300
+          - 6789
+          - 6800:7300
+      protocol: TCP
+      source: {}
+    - action: Allow
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "rook-ceph"
+        selector: app == "rook-ceph-mon"
+      protocol: TCP
+    - action: Allow
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "rook-ceph"
+        selector: app == "rook-ceph-osd"
+      protocol: TCP
+  ingress:
+    - action: Allow
+      destination:
+        ports:
+          - 443
+      protocol: TCP
+      source: {}

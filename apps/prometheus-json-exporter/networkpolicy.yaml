@@ -1,0 +1,19 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-ufm
+  namespace: prometheus
+spec:
+  podSelector:
+    matchLabels:
+      app: json-exporter
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: ${ufm_address}/32
+      ports:
+        - protocol: TCP
+          port: 443

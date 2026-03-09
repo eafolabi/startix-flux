@@ -1,0 +1,27 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: instance-router-v6-network
+  namespace: customer-network
+spec:
+  config: '{
+            "cniVersion": "0.3.1",
+            "name": "instance-router-v6-network",
+            "plugins": [
+              {
+                "type": "gc-customer-network",
+                "vid": 206,
+                "mtu": 1500,
+                "bridgeNetNS": "/var/run/netns/public-v6",
+                "ipam": {
+                  "type": "whereabouts",
+                  "range": "${instance_host_router_range}"
+                }
+              },
+              {
+                "type": "gc-public-filter",
+                "hostnetns": "/var/run/netns/public-v6"
+              }
+            ]
+          }'

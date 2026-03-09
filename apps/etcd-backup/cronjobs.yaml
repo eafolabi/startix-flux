@@ -1,0 +1,169 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-backup
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # Terminate the job if it has not completed in 8 hours
+      activeDeadlineSeconds: 28800
+      backoffLimit: 10
+      template:
+        metadata:
+          labels:
+            app: etcd-backup
+        spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+          initContainers:
+            - name: etcd-backup-fs-cleanup
+              image: public.ecr.aws/aws-cli/aws-cli:2.17.54
+              command: ["/bin/sh", "-c"]
+              args:
+                - |-
+                    rm -rf /etcd-backup/*
+              volumeMounts:
+                - mountPath: /etcd-backup
+                  name: etcd-backup
+            - name: etcd-backup
+              image: quay.io/coreos/etcd:v3.5.12
+              command: ["etcdctl"]
+              args:
+                - --endpoints=https://127.0.0.1:2379
+                - --cacert=/etc/kubernetes/pki/etcd/ca.crt
+                - --cert=/etc/kubernetes/pki/etcd/server.crt
+                - --key=/etc/kubernetes/pki/etcd/server.key
+                - snapshot
+                - save
+                - /etcd-backup/etcd-snapshot-current.db
+              volumeMounts:
+                - mountPath: /etc/kubernetes/pki/etcd
+                  name: etcd-certs
+                  readOnly: true
+                - mountPath: /etcd-backup
+                  name: etcd-backup
+          containers:
+            - name: etcd-upload
+              image: public.ecr.aws/aws-cli/aws-cli:2.17.54
+              command: ["/bin/sh", "-c"]
+              env:
+                - name: CLUSTER_NAME
+                  value: "${environment}"
+              args:
+                - |-
+                    DATE=$(printf '%(%Y-%m-%d)T\n' -1)
+                    DAY=$(printf '%(%-d)T\n' -1)
+                    if [[ "$DAY" -eq 1 ]]; then
+                      BUCKET="b2-k8s-etcd-bar-monthly"
+                    else
+                      BUCKET="b2-k8s-etcd-bar-daily-30"
+                    fi
+                    gpg --import /root/gpg/pub
+                    gpg -e -r b2@genesiscloud.com --batch --yes --trust-model=always \
+                      --output /etcd-backup/etcd-snapshot-"$DATE".db.gpg /etcd-backup/etcd-snapshot-current.db
+                    aws s3 --endpoint-url https://storage.googleapis.com \
+                      cp /etcd-backup/etcd-snapshot-"$DATE".db.gpg s3://"$BUCKET"/"$CLUSTER_NAME"/
+                    rm /etcd-backup/etcd-snapshot-current.db /etcd-backup/etcd-snapshot-"$DATE".db.gpg
+              volumeMounts:
+                - name: etcd-backup
+                  mountPath: /etcd-backup
+                - name: b2-gpg-pub-key
+                  mountPath: "/root/gpg"
+                  readOnly: true
+                - name: b2-aws-s3-writer
+                  mountPath: "/root/.aws"
+                  readOnly: true
+          restartPolicy: OnFailure
+          hostNetwork: true
+          volumes:
+            - name: etcd-certs
+              hostPath:
+                path: "${etcd_certs_location}"
+                type: DirectoryOrCreate
+            - name: etcd-backup
+              persistentVolumeClaim:
+                claimName: pvc-etcd-backup
+            - name: b2-gpg-pub-key
+              secret:
+                secretName: b2-gpg-pub-key
+            - name: b2-aws-s3-writer
+              secret:
+                secretName: b2-aws-s3-writer
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-defrag
+spec:
+  schedule: "5 4 1 * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # Terminate the job if it has not completed in 30 minutes
+      activeDeadlineSeconds: 1800
+      # No retries, just run it once
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: etcd-defrag
+        spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+          containers:
+            - name: etcd-defrag
+              image: nixery.dev/bash/gawk/coreutils/etcd
+              # image: bitnami/etcd:3.5.15 -> /usr/bin/bash
+              command: ["/bin/bash", "-c"]
+              args:
+                - |-
+                    set -eEuo pipefail
+
+                    ETCD_MEMBERS=$(etcdctl endpoint status \
+                                           --command-timeout=30s --cluster -w simple \
+                                           --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+                                           --cert=/etc/kubernetes/pki/etcd/server.crt \
+                                           --key=/etc/kubernetes/pki/etcd/server.key \
+                                           | awk -F", " '{print $1 " " $5}')
+
+                    # TODO, only run defrag if the difference between
+                    # dbSize and the dbSizeInUse is more than 40-50%
+
+                    # Run on non-leader members first, per rhel recommendation
+                    for member in $(echo "$ETCD_MEMBERS" | awk '/false/ {print $1}');
+                    do
+                        if [[ -n $member ]]; then
+                            echo "About to begin deframentation on non-leader $member"
+                            etcdctl defrag --command-timeout=30s --endpoints=$member \
+                                    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+                                    --cert=/etc/kubernetes/pki/etcd/server.crt \
+                                    --key=/etc/kubernetes/pki/etcd/server.key
+                            sleep 60
+                        fi
+                    done
+
+                    # There should only be one leader, defrag it last
+                    leader=$(echo "$ETCD_MEMBERS" | awk '/true/ {print $1}')
+                    if [[ -n $leader ]]; then
+                        echo "About to begin deframentation on leader $leader"
+                        etcdctl defrag --command-timeout=30s --endpoints=$leader \
+                                --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+                                --cert=/etc/kubernetes/pki/etcd/server.crt \
+                                --key=/etc/kubernetes/pki/etcd/server.key
+                    fi
+              volumeMounts:
+                - mountPath: /etc/kubernetes/pki/etcd
+                  name: etcd-certs
+                  readOnly: true
+          restartPolicy: Never
+          hostNetwork: true
+          volumes:
+            - name: etcd-certs
+              hostPath:
+                path: "${etcd_certs_location}"
+                type: DirectoryOrCreate

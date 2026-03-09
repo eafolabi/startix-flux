@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rgw-config
+  namespace: rados-gateway
+data:
+  rgw.yaml: |
+    rgw_realm: euc-de-muc-1
+    rgw_zone: euc-de-muc-1
+    rgw_zonegroup: euc-de-muc-1

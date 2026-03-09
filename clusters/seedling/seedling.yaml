@@ -1,0 +1,37 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: seedling-collection
+  namespace: flux-system
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./collections/seedling
+  prune: false
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-config
+      - kind: ConfigMap
+        name: version-registry
+        optional: true
+  patches:
+    - patch: |
+        apiVersion: kustomize.toolkit.fluxcd.io/v1
+        kind: Kustomization
+        metadata:
+          name: all
+        spec:
+          decryption:
+            provider: sops
+            secretRef:
+              name: sops-age
+      target:
+        kind: Kustomization
+        labelSelector: decrypt.b2.genesiscloud.dev/sops=enabled

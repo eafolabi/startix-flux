@@ -1,0 +1,47 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: oauth2-proxy
+  namespace: ingress
+spec:
+  interval: 30m
+  url: https://oauth2-proxy.github.io/manifests
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: oauth2-proxy
+  namespace: ingress
+spec:
+  targetNamespace: ingress
+  releaseName: oauth2-proxy
+  interval: 5m
+  chart:
+    spec:
+      chart: oauth2-proxy
+      version: ">=6.18.0 <6.19"
+      sourceRef:
+        kind: HelmRepository
+        name: oauth2-proxy
+        namespace: ingress
+      interval: 1m
+  values:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+    config:
+      existingSecret: oauth2-credentials
+    ingress:
+      enabled: true
+      className: nginx
+      hosts:
+        - oauth.${environment}.b2.${base_domain}
+      tls:
+        - hosts:
+            - oauth.${environment}.b2.${base_domain}
+    podLabels:
+      b2.genesiscloud.dev/expose-to-ingress: 'true'
+    extraArgs:
+      whitelist-domain: .${environment}.b2.${base_domain}
+      cookie-domain: .${environment}.b2.${base_domain}

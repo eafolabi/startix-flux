@@ -1,0 +1,23 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ingress-nginx
+  namespace: ingress
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: ingress
+  path: ./apps/ingress-nginx
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      ingress_anycast_ipv4: |
+        [${ingress_anycast_ipv4:=192.0.2.0}]
+      ingress_http_private: ${ingress_http_private:=192.0.2.0}
+      ingress_public: ${ingress_public}

@@ -1,0 +1,50 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: librenms
+  namespace: noc
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: librenms
+  namespace: noc
+subsets:
+  - addresses:
+      - ip: ${infradev_librenms_ip}
+    ports:
+      - port: 80
+        protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+  name: librenms
+  namespace: noc
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: librenms.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - backend:
+              service:
+                name: librenms
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - librenms.${environment}.b2.${base_domain}

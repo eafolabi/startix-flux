@@ -1,0 +1,84 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: frr-exporter
+  name: frr-exporter
+spec:
+  selector:
+    matchLabels:
+      app: frr-exporter
+  template:
+    metadata:
+      labels:
+        app: frr-exporter
+        b2.genesiscloud.dev/expose-to-prometheus: "true"
+    spec:
+      tolerations:
+        - operator: Exists
+      volumes:
+        - hostPath:
+            path: /var/run/frr
+          name: frr-sockets
+      containers:
+        - name: frr-exporter
+          image: tynany/frr_exporter:v1.2.0
+          args:
+            - --frr.socket.dir-path=/frr_sockets
+            - --no-collector.bfd
+            - --collector.bgp6
+            - --collector.bgpl2vpn
+          resources:
+            limits:
+              cpu: 250m
+              memory: 180Mi
+            requests:
+              cpu: 102m
+              memory: 180Mi
+          ports:
+            - containerPort: 9342
+              hostPort: 9342
+              name: prometheus
+          volumeMounts:
+            - mountPath: /frr_sockets
+              name: frr-sockets
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: frr-exporter
+  name: frr-exporter
+spec:
+  selector:
+    matchLabels:
+      app: frr-exporter
+  podMetricsEndpoints:
+    - port: prometheus
+      relabelings:
+        - action: replace
+          regex: (.*)
+          replacement: $1
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: instance
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: frr-exporter
+  namespace: prometheus
+spec:
+  groups:
+    - name: frr-exporter.rules
+      rules:
+        - alert: FRRPortDown
+          expr: (min by (instance, peer) (frr_bgp_peer_state)) != 1
+          labels:
+            severity: warning
+          annotations:
+            summary: A network interface has lost peering to the switch
+            description: >
+              The interface `{{ $labels.peer }}` on host `{{ $labels.instance }}`
+              has no BGP peering with the switch port.

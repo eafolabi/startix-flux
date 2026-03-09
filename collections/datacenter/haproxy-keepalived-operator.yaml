@@ -1,0 +1,20 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: haproxy-keepalived-operator
+  namespace: kube-system
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/haproxy-keepalived-operator/base
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      b2_dataplane_network: ${b2_dataplane_network}
+      b2_api_vip: ${b2_api_vip}

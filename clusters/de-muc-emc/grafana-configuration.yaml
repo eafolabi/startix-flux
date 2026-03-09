@@ -1,0 +1,54 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  namespace: flux-system
+  name: grafana-configuration
+data:
+  cluster_utilization_dashboard_config: |
+    [
+      {
+        "resource": "cpu-cores",
+        "installed": 9001,
+        "node_type": "cpu-hosts",
+        "name": "CPU"
+      },
+      {
+        "resource": "gpu/habana.ai/gaudi2",
+        "installed": 9001,
+        "node_type": "gpu-hosts",
+        "name": "Gaudi2"
+      },
+      {
+        "resource": "gpu/nvidia.com/gtx-1080ti",
+        "installed": 9001,
+        "node_type": "gpu-hosts",
+        "name": "GTX 1080Ti"
+      },
+      {
+        "resource": "gpu/nvidia.com/h100-sxm5-80g",
+        "installed": 9001,
+        "node_type": "gpu-hosts",
+        "name": "H100 80G"
+      },
+      {
+        "resource": "gpu/nvidia.com/rtx-3060ti",
+        "installed": 9001,
+        "node_type": "gpu-hosts",
+        "name": "RTX 3060Ti"
+      },
+      {
+        "resource": "gpu/nvidia.com/rtx-3080",
+        "installed": 9001,
+        "node_type": "gpu-hosts",
+        "name": "RTX 3080"
+      },
+      {
+        "resource": "gpu/nvidia.com/rtx-3090",
+        "installed": 9001,
+        "node_type": "gpu-hosts",
+        "name": "RTX 3090"
+      }
+    ]

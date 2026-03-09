@@ -1,0 +1,31 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: join-token-server
+  namespace: infra
+spec:
+  interval: 60m0s
+  # yamllint disable-line rule:line-length
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-join-token-server/join-token-server-flux
+  insecure: true
+  ref:
+    tag: ${join_token_server_flux:=0.2.2}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: join-token-server
+  namespace: infra
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: join-token-server
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      b2_api_vip: ${b2_api_vip}

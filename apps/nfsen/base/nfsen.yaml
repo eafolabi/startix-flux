@@ -1,0 +1,82 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfsen-ng
+  namespace: nfsen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfsen-ng
+  template:
+    metadata:
+      labels:
+        app: nfsen-ng
+        b2.genesiscloud.dev/expose-to-ingress: "true"
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+        - name: nfsen-ng
+          image: ghcr.io/gc-private/b2-nfsen-ng:priederer-2024-05-06-3
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 1
+              memory: 512Mi
+          command:
+            - bash
+          args:
+            - -exuc
+            - ls -1 /var/nfdump/profiles-data/live/ | sed 's/$/;/' > /tmp/sources.conf && bash -exu /tmp/entrypoint.sh
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: data
+              mountPath: /var/nfdump/profiles-data/live
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: nfsen
+        - name: config
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfsen-ng
+  namespace: nfsen
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: nfsen-ng
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nfsen-ng
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - nfsen-ng.${environment}.b2.${base_domain}
+  rules:
+    - host: nfsen-ng.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nfsen-ng
+                port:
+                  number: 80

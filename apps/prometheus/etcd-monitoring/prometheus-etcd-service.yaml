@@ -1,0 +1,16 @@
+# yamllint disable
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: etcd
+  name: etcd-metrics
+  namespace: kube-system
+spec:
+  selector:
+      component: etcd
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 2381
+      targetPort: 2381

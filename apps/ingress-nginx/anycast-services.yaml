@@ -1,0 +1,78 @@
+---
+# Currently, these services all point to the same Ingress instance.
+# In the future, we'll probably split them apart.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-internal
+  namespace: ingress
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  externalIPs: ${ingress_anycast_ipv4}
+  clusterIP: ${ingress_http_private/X/1}
+  ports:
+  - appProtocol: http
+    name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - appProtocol: https
+    name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  selector:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-northbound
+  namespace: ingress
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  clusterIP: ${ingress_http_private/X/2}
+  ports:
+  - appProtocol: http
+    name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - appProtocol: https
+    name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  selector:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-public
+  namespace: ingress
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  clusterIP: ${ingress_http_private/X/3}
+  ports:
+  - appProtocol: http
+    name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - appProtocol: https
+    name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  selector:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx

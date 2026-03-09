@@ -1,0 +1,15 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-terraform-controller-to-its-runners
+spec:
+  selector: app.kubernetes.io/created-by == 'tf-controller'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app.kubernetes.io/name == 'tf-controller'
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "flux-system"

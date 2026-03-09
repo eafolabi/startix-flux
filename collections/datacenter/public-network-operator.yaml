@@ -1,0 +1,53 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: public-network-operator
+  namespace: infra
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-public-network-operator/public-network-operator-flux
+  insecure: true
+  ref:
+    tag: ${public_network_operator_flux:=0.27.3}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: public-network-operator
+  namespace: infra
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: public-network-operator
+  targetNamespace: infra
+  path: ./${public_network_operator_configuration:=default}
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      core_router_edge_a_link: ${core_router_edge_a_link}
+      core_router_edge_b_link: ${core_router_edge_b_link}
+      core_router_edge_a_ipv4: ${core_router_edge_a_ipv4}
+      core_router_edge_a_ipv4_gw: ${core_router_edge_a_ipv4_gw:=192.0.2.0}
+      core_router_edge_b_ipv4: ${core_router_edge_b_ipv4}
+      core_router_vipv4: ${core_router_vipv4}
+      core_router_edge_a_ipv6: ${core_router_edge_a_ipv6}
+      core_router_edge_b_ipv6: ${core_router_edge_b_ipv6}
+      core_router_vipv6: ${core_router_vipv6}
+      core_router_fixed_ipv6: ${core_router_fixed_ipv6}
+      core_router_edge_peers_ipv4: ${core_router_edge_peers_ipv4}
+      core_router_edge_peers_ipv6: ${core_router_edge_peers_ipv6}
+      ingress_private: ${ingress_private}
+      ingress_public: ${ingress_public}
+      ingress_dns_private: ${public_dns_service_ip/X/0}
+      core_router_anycast_ipv4: ${core_router_anycast_ipv4}
+      instance_host_router_range: ${instance_host_router_range}
+      number_of_core_router_pods: |-
+        "${number_of_core_router_pods}"
+      ingress_http_general_private: ${ingress_http_private/X/0}
+      ingress_http_anycast_private: ${ingress_http_private/X/1} ${ingress_http_private/X/2} ${ingress_http_private/X/3}
+      s3_service_ip: ${s3_service_ip}
+      akvorado_service_ip: ${akvorado_service_ip:=192.0.2.0}

@@ -1,0 +1,56 @@
+---
+apiVersion: kubevirt.io/v1
+kind: KubeVirt
+metadata:
+  name: kubevirt
+  namespace: kubevirt
+spec:
+  configuration:
+    permittedHostDevices:
+      pciHostDevices:
+        - pciVendorSelector: "10DE:1b06"
+          resourceName: "nvidia.com/gtx-1080ti"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:2204"
+          resourceName: "nvidia.com/rtx-3090"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:2206"
+          resourceName: "nvidia.com/rtx-3080-lhr"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:2216"
+          resourceName: "nvidia.com/rtx-3080-lhr"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:2489"
+          resourceName: "nvidia.com/rtx-3060ti-lhr"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:10ef"
+          resourceName: "nvidia.com/gp102-audio" # used by 1080Ti
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:1aef"
+          resourceName: "nvidia.com/ga102-audio" # used by 3080 and 3090
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:228b"
+          resourceName: "nvidia.com/ga104-audio" # used by 3060Ti
+          externalResourceProvider: false
+        - pciVendorSelector: "1DA3:1020"
+          resourceName: "habana.ai/gaudi2"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:2335"
+          resourceName: "nvidia.com/h200-sxm5-141g"
+        - pciVendorSelector: "10DE:2330"
+          resourceName: "nvidia.com/h100-sxm5-80g"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:22A3"
+          resourceName: "nvidia.com/h100-nvswitch"
+          externalResourceProvider: false
+        - pciVendorSelector: "15B3:1021"
+          resourceName: "nvidia.com/connectx-7"
+          externalResourceProvider: false
+        - pciVendorSelector: "15B3:101E"
+          resourceName: "nvidia.com/connectx-7-vf"
+          externalResourceProvider: false
+        - pciVendorSelector: "10DE:2231"
+          resourceName: "nvidia.com/rtx-a5000"
+        - pciVendorSelector: "10DE:2684"
+          resourceName: "nvidia.com/rtx-4090"
+          externalResourceProvider: false

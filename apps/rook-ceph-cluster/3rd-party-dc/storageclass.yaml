@@ -1,0 +1,65 @@
+---
+# Customer instances block storage
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: ssd-volume-data
+  namespace: rook-ceph
+spec:
+  deviceClass: ssd
+  failureDomain: host
+  enableRBDStats: true
+  replicated:
+    size: 3
+  parameters:
+    compression_mode: none
+    pg_num: "8"
+---
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: ssd-volume
+  namespace: rook-ceph
+spec:
+  failureDomain: host
+  deviceClass: ssd
+  enableRBDStats: true
+  erasureCoded:
+    dataChunks: 2
+    codingChunks: 1
+  parameters:
+    compression_mode: none
+    pg_num: "32"
+    target_size_ratio: "0.8"
+---
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: hdd-volume-data
+  namespace: rook-ceph
+spec:
+  deviceClass: ssd
+  failureDomain: host
+  enableRBDStats: true
+  replicated:
+    size: 3
+  parameters:
+    compression_mode: none
+    pg_num: "8"
+---
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: hdd-volume
+  namespace: rook-ceph
+spec:
+  failureDomain: host
+  deviceClass: ssd
+  enableRBDStats: true
+  erasureCoded:
+    dataChunks: 2
+    codingChunks: 1
+  parameters:
+    compression_mode: none
+    pg_num: "16"
+    target_size_ratio: "0.8"

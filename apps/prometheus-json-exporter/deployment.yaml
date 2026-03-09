@@ -1,0 +1,69 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: json-exporter
+  namespace: prometheus
+  labels:
+    app: json-exporter
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: json-exporter
+  template:
+    metadata:
+      labels:
+        app: json-exporter
+        b2.genesiscloud.dev/expose-to-prometheus: "true"
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+        - name: json-exporter
+          image: quay.io/prometheuscommunity/json-exporter:v0.7.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ -f /etc/json-exporter/config.yml ]; then
+                /bin/json_exporter --config.file=/etc/json-exporter/config.yml
+              else
+                /bin/json_exporter
+              fi
+          ports:
+            - containerPort: 7979
+              name: http
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/json-exporter
+            - name: ufm-auth-secret
+              mountPath: /etc/ufm-auth
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: json-exporter-config
+            optional: true
+        - name: ufm-auth-secret
+          secret:
+            secretName: ufm-credentials
+            optional: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: json-exporter
+  namespace: prometheus
+  labels:
+    app: json-exporter
+spec:
+  selector:
+    app: json-exporter
+  ports:
+    - name: http
+      port: 7979
+      targetPort: http

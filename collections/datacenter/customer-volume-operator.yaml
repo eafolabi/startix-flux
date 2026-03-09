@@ -1,0 +1,45 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: customer-volume-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-customer-volume-operator/customer-volume-operator-flux
+  insecure: true
+  ref:
+    tag: ${customer_volume_operator_flux:=0.12.2}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: customer-volume-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: customer-volume-operator
+  targetNamespace: customer-operators
+  path: ./
+  prune: true
+  wait: false # The spdk-Daemonset has `updateStrategy: OnDelete`, which breaks the health-check: https://github.com/fluxcd/flux2/issues/2078
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+      ceph_pool_ssd: ${ceph_pool_ssd}
+      ceph_pool_ssd_data: ${ceph_pool_ssd_data}
+      ceph_pool_ssd_cluster: ${ceph_pool_ssd_cluster}
+      ceph_pool_hdd: ${ceph_pool_hdd}
+      ceph_pool_hdd_data: ${ceph_pool_hdd_data}
+      ceph_pool_hdd_cluster: ${ceph_pool_hdd_cluster}
+      ceph_pool_ssd2: ${ceph_pool_ssd2}
+      ceph_pool_ssd2_data: ${ceph_pool_ssd2_data}
+      ceph_pool_ssd2_cluster: ${ceph_pool_ssd2_cluster}
+      ceph_clusters_additional_fsids: ${ceph_clusters_additional_fsids:=""}
+      # yamllint disable-line rule:line-length
+      spdk_image: ghcr.io/gc-private/b2-docker-image-spdk/spdk:${spdk:=0.5.0}
+      spdk_memory_allocation: ${spdk_memory_allocation:=512M}

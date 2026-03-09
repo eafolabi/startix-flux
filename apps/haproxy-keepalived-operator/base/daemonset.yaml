@@ -1,0 +1,198 @@
+# yamllint disable rule:line-length
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: haproxy-keepalived-operator
+  namespace: kube-system
+  labels:
+    app: haproxy-keepalived-operator
+spec:
+  selector:
+    matchLabels:
+      app: haproxy-keepalived-operator
+  template:
+    metadata:
+      labels:
+        app: haproxy-keepalived-operator
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      serviceAccount: haproxy-keepalived-operator
+      hostNetwork: true
+      volumes:
+        - name: haproxy-cfg
+          hostPath:
+            path: /srv/haproxy
+        - name: keepalived-cfg
+          hostPath:
+            path: /srv/keepalived
+      containers:
+        - name: haproxy-keepalived-operator
+          # rationale for nixery: It is unlikely that a version change in any of these tools causes breakage.
+          # However: TODO: Replace nixery as it is less reliable (availability-wise) than other solutions.
+          image: nixery.dev/shell/gnugrep/kubernetes/diffutils/iproute2/jq
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+          env:
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: haproxy-cfg
+              mountPath: /srv/haproxy
+            - name: keepalived-cfg
+              mountPath: /srv/keepalived
+          command:
+            - bash
+            - -c
+            - |
+                set -eux
+                set -o pipefail
+
+                while true; do
+                my_ip=$(kubectl get nodes -l node-role.kubernetes.io/control-plane -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="Hostname")].address}{":"}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' | grep $NODENAME | cut -d: -f2)
+                keepalived_snippet=$(kubectl get nodes -l node-role.kubernetes.io/control-plane -o jsonpath='{range .items[*]}{"    "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' | grep -v $my_ip || true)
+                haproxy_snippet=$(kubectl get nodes -l node-role.kubernetes.io/control-plane -o jsonpath='{range .items[*]}{"  server "}{.status.addresses[?(@.type=="Hostname")].address}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{":6443 check\n"}{end}')
+                interface=$(ip -j addr show to ${b2_dataplane_network} | jq -r '.[] | .ifname' | grep -v vip)
+
+                # Add dummy peer if none are present yet, otherwise keepalived fails
+                if [ -z "$keepalived_snippet" ]
+                then
+                  keepalived_snippet="0.0.0.0"
+                fi
+
+                cat > keepalived.conf <<EOF
+                global_defs {
+                  vrrp_skip_check_adv_addr
+                }
+
+                vrrp_script check_haproxy {
+                  script "/sbin/curl -kLsf https://localhost/healthz"
+                  interval 1
+                  fall 2
+                  rise 2
+                }
+
+                vrrp_instance haproxy-vip {
+                  state BACKUP
+                  priority 100
+                  interface $interface
+                  virtual_router_id 60
+                  advert_int 1
+                  authentication {
+                    auth_type PASS
+                    auth_pass 1111
+                  }
+                  unicast_src_ip $my_ip
+                  unicast_fault_no_peer
+                  unicast_peer {
+                $keepalived_snippet
+                  }
+                  virtual_ipaddress {
+                    ${b2_api_vip} dev vip
+                  }
+                  track_script {
+                    check_haproxy
+                  }
+                }
+                EOF
+
+                cat > haproxy.conf <<EOF
+                global
+                  maxconn     4000
+                defaults
+                  log global
+                  option  httplog
+                  option  dontlognull
+                  timeout connect 5000
+                  timeout client 50000
+                  timeout server 50000
+
+                frontend kube-apiserver
+                  bind *:443
+                  mode tcp
+                  option tcplog
+                  default_backend kube-apiserver
+
+                backend kube-apiserver
+                  mode tcp
+                  option tcp-check
+                  balance roundrobin
+                  default-server inter 10s downinter 5s rise 2 fall 2 slowstart 60s maxconn 250 maxqueue 256 weight 100
+                $haproxy_snippet
+                EOF
+
+                if ! cmp haproxy.conf /srv/haproxy/haproxy.conf; then
+                  cp haproxy.conf /srv/haproxy/haproxy.conf
+                  echo "reload" | kubectl exec -in kube-system kube-api-haproxy-$NODENAME -- socat -t3 /master.sock stdin
+                fi
+
+                if ! cmp keepalived.conf /srv/keepalived/keepalived.conf; then
+                  cp keepalived.conf /srv/keepalived/keepalived.conf
+                  kubectl exec -in kube-system kube-api-keepalived-$NODENAME -- kill -HUP 1
+                fi
+
+                sleep 60
+                done
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: haproxy-keepalived-operator
+  namespace: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: kube-system
+  name: haproxy-keepalived-operator
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: haproxy-keepalived-operator
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: haproxy-keepalived-operator
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: haproxy-keepalived-operator
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: kube-system
+  name: haproxy-keepalived-operator
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: haproxy-keepalived-operator
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: haproxy-keepalived-operator
+roleRef:
+  kind: Role
+  name: haproxy-keepalived-operator
+  apiGroup: rbac.authorization.k8s.io

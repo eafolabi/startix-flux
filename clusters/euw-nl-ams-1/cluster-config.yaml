@@ -1,0 +1,158 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: flux-system
+  name: cluster-config
+data:
+  environment: euw-nl-ams-1
+  base_domain: gcdev.zone
+  environment_flag_emoji: "flag-nl"
+  b2_dataplane_network: 10.48.0.0/16
+  b2_service_network: 10.49.0.0/16
+  b2_api_vip: 10.48.0.1
+  kubedns_service_ip: 10.49.0.10
+  elastiflow_service_ip: 10.49.0.20
+  pxe_dhcp_service_ip: 10.49.0.30
+  evpn_rr1_service_ip: 10.49.0.40
+  evpn_rr2_service_ip: 10.49.0.41
+  ntp_service_ip: 10.49.0.50
+  s3_service_ip: 10.49.0.51
+  dns_service_ip: 10.49.0.53
+  dnsmasq_service_ip: 10.49.0.67
+  l2_underlay_network: 10.50.0.0/18
+  l2_underlay_netmask: 255.255.192.0
+  l2_underlay_gw_ip: 10.50.0.1
+  l2_underlay_dhcp_range_start_ip: 10.50.32.0
+  l2_underlay_dhcp_range_end_ip: 10.50.63.254
+  l2_underlay_bgp_control_plane_peers: '[{"dcent-1-control-plane": "10.50.16.0"}, {"dcent-2-control-plane": "10.50.16.1"}, {"dcent-3-control-plane": "10.50.16.2"}]'
+  coredns_reverse_zones: 49.10.in-addr.arpa. 48.10.in-addr.arpa. 52.10.in-addr.arpa. 53.10.in-addr.arpa. 54.10.in-addr.arpa. 55.10.in-addr.arpa.
+  public_dns_service_ip: 10.49.0.6X  # X gets expanded to 0/1/2 for anycast/primary/secondary
+  public_internet_range: 203.28.15.0/24
+  public_network_operator_configuration: 3rd-party-dc
+  instance_host_router_range: "2a10:1::/64"
+  number_of_core_router_pods: "3"
+  core_router_edge_a_link: eno34np1
+  core_router_edge_b_link: unused
+  core_router_edge_a_ipv4: 202.181.153.148/24 202.181.153.149/24 202.181.153.150/24
+  core_router_edge_a_ipv4_gw: 202.181.153.254
+  core_router_edge_b_ipv4: unused
+  core_router_vipv4: 203.28.15.1/24 203.28.15.2/24 203.28.15.3/24
+  core_router_edge_a_ipv6: fe80:7000:0:1::2/64
+  core_router_edge_b_ipv6: fe80:7000:0:2::2/64
+  core_router_vipv6: fe80:7000:14:0::1/64
+  core_router_fixed_ipv6: fe80:7000:14:0::4/64
+  core_router_edge_peers_ipv4: 202.181.153.254
+  core_router_edge_peers_ipv6: 2a10:7000:0:1::1 2a10:7000:0:2::1
+  core_router_anycast_ipv4: 202.181.153.152, 202.181.153.153, 202.181.153.154  # last two not issued
+  core_router_node_flow_ip1: 10.48.0.8/32
+  core_router_node_flow_ip2: 10.48.0.10/32
+  core_router_node_flow_ip3: 10.48.0.12/32
+  akvorado_pvc_size: 40Gi
+  akvorado_service_ip: 10.49.0.81
+  service_anycast_ipv4: 202.181.153.152  # first IP from core_router_anycast_ipv4
+  ingress_anycast_ipv4: 202.181.153.153, 202.181.153.154  # last two IPs from core_router_anycast_ipv4 ;not issued
+  ingress_http_private: 10.49.0.7X  # X gets expanded later
+  ingress_private: 10.48.0.1
+  ingress_public: 202.181.153.151
+  ignition_server: 10.48.0.1:32266
+  join_token_server: 10.48.0.1:31385
+  ceph_pool_ssd: ssd-volume-data
+  ceph_pool_ssd_data: ssd-volume
+  ceph_pool_ssd_cluster: 69f4ca1f-443b-4023-a9f0-282ea9765ef5
+  ceph_pool_hdd: hdd-volume-data
+  ceph_pool_hdd_data: hdd-volume
+  ceph_pool_hdd_cluster: 69f4ca1f-443b-4023-a9f0-282ea9765ef5
+  ceph_pool_ssd2: ssd-volume-data
+  ceph_pool_ssd2_data: ssd-volume
+  ceph_pool_ssd2_cluster: 69f4ca1f-443b-4023-a9f0-282ea9765ef5
+  ceph_clusters_additional_fsids:
+  ceph_monitoring_endpoints: '{ip: 192.168.0.255}'
+  etcd_certs_location: /etc/kubernetes/pki/etcd
+  etcd_backup_sc_name: "replicated2"
+  rook_ceph_nodes: '[{name: dcent-1-control-plane}, {name: dcent-2-control-plane}, {name: dcent-3-control-plane}]'
+  e2e_tests_cron_inst_susp: '"false"'
+  e2e_tests_cron_sg_susp: '"false"'
+  e2e_tests_cron_vol_susp: '"false"'
+  placement_options: '''''''["A","B"]'''''''  # so it makes it successfully through all layers
+  infradev_librenms_ip: 192.168.0.255
+  infradev_flowmon_ip: 192.168.0.255
+  vast_api_ip: 192.168.0.255
+  filesystem_operator_replicas: "0"
+  rdma_network_operator_replicas: "0"
+  ufm_address: 192.168.0.255
+  public_dns_zones: instance.euw-nl-ams-1.genesiscloudusercontent.com. 153.181.202.in-addr.arpa. 0.0.0.7.0.1.a.2.ip6.arpa. euw-nl-ams-1.gciprd.com.
+  prometheus_size: 100Gi
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: e2e-tests
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeadm-config
+  namespace: kube-system
+data:
+  ClusterConfiguration: |
+    apiVersion: kubeadm.k8s.io/v1beta3
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        authorization-mode: Node,RBAC
+        feature-gates: APIServerTracing=true
+        tracing-config-file: /cfg/apiserver-tracing.yaml
+      extraVolumes:
+        - name: tracingcfg
+          hostPath: /opt/apiserver-tracing.yaml
+          mountPath: /cfg/apiserver-tracing.yaml
+          readOnly: true
+          pathType: File
+      timeoutForControlPlane: 4m0s
+    certificatesDir: /etc/kubernetes/pki
+    clusterName: kubernetes
+    controlPlaneEndpoint: 10.48.0.1:443
+    controllerManager:
+      extraArgs:
+        bind-address: 0.0.0.0
+      extraVolumes:
+        - name: flexvolume-dir
+          hostPath: /opt/kubernetes/kubelet-plugins/volume/exec
+          mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+          pathType: DirectoryOrCreate
+    dns: {}
+    etcd:
+      local:
+        dataDir: /var/lib/etcd
+        extraArgs:
+          listen-metrics-urls: http://0.0.0.0:2381
+          auto-compaction-mode: periodic
+          auto-compaction-retention: 15m
+    imageRepository: registry.k8s.io
+    kubernetesVersion: v1.29.8
+    networking:
+      dnsDomain: cluster.local
+      podSubnet: 10.52.0.0/14
+      serviceSubnet: 10.49.0.0/16
+    scheduler:
+      extraArgs:
+        bind-address: 0.0.0.0
+        config: /cfg/schedulerconfig.yaml
+      extraVolumes:
+        - name: cfg
+          hostPath: /opt/schedulerconfig.yaml
+          mountPath: /cfg/schedulerconfig.yaml
+          readOnly: true
+          pathType: File
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: instance-specs
+  namespace: e2e-tests
+data:
+  LOG_LEVEL: INFO
+  cpu_nr: "4"
+  ram_gb: "12"
+  accel_type: nvidia.com/rtx-3090

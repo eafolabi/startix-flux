@@ -1,0 +1,28 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: instance-tuning
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-instance-tuning/instance-tuning-flux
+  insecure: true
+  ref:
+    tag: ${instance_tuning_flux:=0.6.0}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: instance-tuning
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: instance-tuning
+  targetNamespace: customer-operators
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s

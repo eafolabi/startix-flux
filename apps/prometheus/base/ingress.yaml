@@ -1,0 +1,100 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: prometheus
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - prometheus.${environment}.b2.${base_domain}
+  rules:
+    - host: prometheus.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-k8s
+                port:
+                  number: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-basicauth
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: prometheus-basicauth-credentials
+    nginx.ingress.kubernetes.io/auth-realm: 'B2 Prometheus'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - prometheus-auth.${environment}.b2.${base_domain}
+  rules:
+    - host: prometheus-auth.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-k8s
+                port:
+                  number: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: prometheus
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - grafana.${environment}.b2.${base_domain}
+  rules:
+    - host: grafana.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: alertmanager
+  namespace: prometheus
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - alertmanager.${environment}.b2.${base_domain}
+  rules:
+    - host: alertmanager.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: alertmanager-main
+                port:
+                  number: 9093

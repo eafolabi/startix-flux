@@ -1,0 +1,14 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-oauth2-proxy
+spec:
+  selector: app.kubernetes.io/instance == 'oauth2-proxy'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports: # needs to talk to the public internet
+          - 80
+          - 443

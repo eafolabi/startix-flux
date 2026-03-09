@@ -1,0 +1,25 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: expose-to-apiserver
+spec:
+  selector: b2.genesiscloud.dev/expose-to-apiserver == 'true'
+  types:
+    - Ingress
+  ingress:
+    # Allow incoming traffic from the K8s API server.
+    # Unfortunately, since the API servers run in the network namespaces of their hosts,
+    # matching them properly is not really possible so we need this.
+    - action: Allow
+      protocol: TCP
+      source:
+        nets:
+          # Norway control plane prefix
+          - 10.24.2.0/24
+          # EMC control plane prefix
+          - 10.8.2.0/24
+          # easy compute control plane prefix
+          - 10.32.0.0/18
+          # DCent control plane
+          - 10.48.0.0/18

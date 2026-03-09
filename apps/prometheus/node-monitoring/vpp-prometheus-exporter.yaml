@@ -1,0 +1,119 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vpp-prometheus-exporter
+  labels:
+    app: vpp-prometheus-exporter
+spec:
+  selector:
+    matchLabels:
+      app: vpp-prometheus-exporter
+  template:
+    metadata:
+      labels:
+        app: vpp-prometheus-exporter
+        b2.genesiscloud.dev/expose-to-prometheus: "true"
+    spec:
+      tolerations:
+        - key: gpu-host
+          operator: Exists
+        - key: cpu-host
+          operator: Exists
+      containers:
+        - name: vpp-prometheus-exporter
+          image: debian:bookworm-slim
+          command: ["/opt/vpp/usr/bin/vpp_prometheus_export"]
+          args:
+            - "v2"
+            - "^/sys/heartbeat"
+            - "^/sys/last_stats_clear"
+            - "^/sys/boottime"
+            - "^/sys/vector_rate"
+            - "^/sys/vector_rate_per_worker"
+            - "^/sys/loops_per_worker"
+            - "^/sys/num_worker_threads"
+            - "^/sys/last_update"
+            - "^/sys/input_rate"
+            - "^/mem/"
+            - "^/nodes/"
+            - "^/interfaces/"
+            - "^/buffer-pools/"
+          env:
+            - name: LD_LIBRARY_PATH
+              value: "/opt/vpp/usr/lib/x86_64-linux-gnu"
+          ports:
+            - containerPort: 9482
+              name: metrics
+              protocol: TCP
+          volumeMounts:
+            - name: vpp-sock
+              mountPath: /run/vpp
+              readOnly: true
+            - name: vpp-bin
+              mountPath: /opt/vpp/usr/bin
+              readOnly: true
+            - name: vpp-lib
+              mountPath: /opt/vpp/usr/lib/x86_64-linux-gnu
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9482
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 2
+            timeoutSeconds: 2
+
+      volumes:
+        - name: vpp-sock
+          hostPath:
+            path: /run/vpp
+            type: DirectoryOrCreate
+        - name: vpp-bin
+          hostPath:
+            path: /opt/vpp/usr/bin
+            type: Directory
+        - name: vpp-lib
+          hostPath:
+            path: /opt/vpp/usr/lib/x86_64-linux-gnu
+            type: Directory
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vpp-prometheus-exporter
+  labels:
+    app: vpp-prometheus-exporter
+spec:
+  selector:
+    app: vpp-prometheus-exporter
+  ports:
+    - name: vpp-prometheus-exporter
+      port: 9482
+      targetPort: 9482
+      protocol: TCP
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: vpp-prometheus-exporter
+  name: vpp-prometheus-exporter
+spec:
+  selector:
+    matchLabels:
+      app: vpp-prometheus-exporter
+  endpoints:
+    - port: vpp-prometheus-exporter
+      interval: 30s
+      path: /metrics
+      relabelings:
+        - action: replace
+          regex: (.*)
+          replacement: $1
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: instance

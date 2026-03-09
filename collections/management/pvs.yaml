@@ -1,0 +1,231 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: pypi-packages
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/pypi-packages"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: pypi
+    name: pypi-packages
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: pvc-etcd-backup
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/etcd-backup"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: backup
+    name: pvc-etcd-backup
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: data-harbor-redis-0
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/data-harbor-redis-0"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: harbor
+    name: data-harbor-redis-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: data-harbor-database-0
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/data-harbor-database-0"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: harbor
+    name: database-data-harbor-database-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: harbor-jobservice
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/harbor-jobservice"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: harbor
+    name: harbor-jobservice
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: harbor-registry
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/harbor-registry"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: harbor
+    name: harbor-registry
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: prometheus-k8s-db-prometheus-k8s-0
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/prometheus"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: prometheus
+    name: prometheus-k8s-db-prometheus-k8s-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+  name: pv-pypi-backup
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 20Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/srv/pypi-backup"
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: backup
+    name: pvc-pypi-backup
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - management-cluster

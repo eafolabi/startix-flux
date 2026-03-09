@@ -1,0 +1,39 @@
+---
+apiVersion: kamaji.clastix.io/v1alpha1
+kind: DataStore
+metadata:
+  name: default
+  namespace: kamaji-system
+spec:
+  basicAuth:
+    password:
+      secretReference:
+        keyPath: password
+        name: kamaji-postgres-app
+        namespace: kamaji-system
+    username:
+      secretReference:
+        keyPath: username
+        name: kamaji-postgres-app
+        namespace: kamaji-system
+  driver: PostgreSQL
+  endpoints:
+    - kamaji-postgres-rw.kamaji-system.svc:5432
+  tlsConfig:
+    certificateAuthority:
+      certificate:
+        secretReference:
+          keyPath: ca.crt
+          name: postgres-server-ca-key-pair
+          namespace: kamaji-system
+    clientCertificate:
+      certificate:
+        secretReference:
+          keyPath: tls.crt
+          name: kamaji-postgres-client-cert
+          namespace: kamaji-system
+      privateKey:
+        secretReference:
+          keyPath: tls.key
+          name: kamaji-postgres-client-cert
+          namespace: kamaji-system

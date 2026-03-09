@@ -1,0 +1,20 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: vast-monitoring
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: customer-operators
+  path: ./apps/prometheus/vast
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      vast_api_ip: ${vast_api_ip:=192.0.2.0}

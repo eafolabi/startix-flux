@@ -1,0 +1,24 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: akvorado-console
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+    nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - akvorado.${environment}.b2.${base_domain}
+  rules:
+    - host: akvorado.${environment}.b2.${base_domain}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: akvorado-console
+                port:
+                  number: 8080

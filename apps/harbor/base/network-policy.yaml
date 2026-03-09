@@ -1,0 +1,47 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-harbor-internal
+  namespace: harbor
+spec:
+  selector: app == 'harbor'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'harbor'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'harbor'
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-harbor-external
+  namespace: harbor
+spec:
+  selector: app == 'harbor' && component == 'nginx'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 8080
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-harbor-internet
+  namespace: harbor
+spec:
+  selector: app == 'harbor' && component == 'core'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports: # needs to talk to the public internet
+          - 80
+          - 443

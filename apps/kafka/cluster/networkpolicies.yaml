@@ -1,0 +1,70 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: kafka-network-policy-kafka
+spec:
+  selector: strimzi.io/component-type == 'kafka'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        namespaceSelector: projectcalico.org/name == 'kafka-system'
+        selector: strimzi.io/kind == 'cluster-operator'
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: strimzi.io/component-type in {'kafka', 'entity-operator'}
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 9092
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: strimzi.io/component-type in {'zookeeper', 'kafka'}
+  types:
+    - Ingress
+    - Egress
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: kafka-network-policy-zookeeper
+spec:
+  selector: strimzi.io/component-type == 'zookeeper'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        namespaceSelector: projectcalico.org/name == 'kafka-system'
+        selector: strimzi.io/kind == 'cluster-operator'
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: strimzi.io/component-type in {'zookeeper', 'kafka', 'entity-operator'}
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: strimzi.io/component-type == 'zookeeper'
+  types:
+    - Ingress
+    - Egress
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: kafka-network-policy-entity-operator
+spec:
+  selector: strimzi.io/component-type == 'entity-operator'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: strimzi.io/component-type in {'zookeeper', 'kafka'}
+  types:
+    - Ingress
+    - Egress

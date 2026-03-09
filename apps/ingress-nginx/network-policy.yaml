@@ -1,0 +1,59 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-nginx
+spec:
+  selector: app.kubernetes.io/name == 'ingress-nginx'
+  types:
+    - Ingress
+    - Egress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 80
+          - 443
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        namespaceSelector: all()
+        selector: has(b2.genesiscloud.dev/expose-to-ingress) && b2.genesiscloud.dev/expose-to-ingress == "true"
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: librenms
+          namespace: noc
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: checkmk
+          namespace: noc
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: ufm
+          namespace: noc
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: vast
+          namespace: noc
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: flowmon
+          namespace: noc
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: vast-s3
+          namespace: noc

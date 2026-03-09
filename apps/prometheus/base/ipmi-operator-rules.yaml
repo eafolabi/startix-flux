@@ -1,0 +1,36 @@
+---
+# yamllint disable rule:line-length
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ipmi-operator-rules
+spec:
+  groups:
+    - name: "ipmi-operator.rules"
+      rules:
+        - alert: "BMCUnreachable"
+          expr: "bmc_node_status == 0"
+          for: "20m"
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "{{ $labels.node }} BMC is not accessible"
+            description: "The BMC of node {{ $labels.node }} is not accessible. Please check the BMC connection."
+
+        - alert: "NodeRebooted"
+          expr: "bmc_node_reboot > 0"
+          for: "5s"
+          labels:
+            severity: "warning"
+          annotations:
+            summary: "{{ $labels.node }} has been rebooted"
+            description: "The node {{ $labels.node }} has been rebooted."
+
+        - alert: BMCNodeRebootMultipleTimes
+          expr: increase(bmc_node_reboot[10m]) > 1
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.node }} rebooted multiple times in the last 10 minutes"
+            description: "{{ $labels.node }} has been rebooted multiple times in the last 10 minutes. Please check the node"

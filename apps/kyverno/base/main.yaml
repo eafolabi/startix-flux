@@ -1,0 +1,90 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: kyverno
+  namespace: kyverno
+spec:
+  interval: 60m
+  url: https://kyverno.github.io/kyverno/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kyverno
+  namespace: kyverno
+spec:
+  targetNamespace: kyverno
+  releaseName: kyverno
+  interval: 60m
+  chart:
+    spec:
+      chart: kyverno
+      version: ">=3.0.5 <3.1"
+      sourceRef:
+        kind: HelmRepository
+        name: kyverno
+        namespace: kyverno
+      interval: 60m
+  values:
+    cleanupJobs:
+      admissionReports:
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+      clusterAdmissionReports:
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+
+    admissionController:
+      replicas: 3 # 3 is given as the minimum in the documentation
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      podLabels:
+        b2.genesiscloud.dev/expose-to-apiserver: "true"
+        b2.genesiscloud.dev/allow-to-apiserver: "true"
+      container:
+        resources:
+          limits:
+            # Default is 384Mi, but apparently that's not enough
+            memory: 3Gi
+      networkPolicy:
+        enabled: true
+
+    cleanupController:
+      replicas: 2 # 2 is given as the minimum in the documentation
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      podLabels:
+        b2.genesiscloud.dev/expose-to-apiserver: "true"
+        b2.genesiscloud.dev/allow-to-apiserver: "true"
+      networkPolicy:
+        enabled: true
+
+    webhooksCleanup:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+
+    backgroundController:
+      replicas: 2 # 2 is given as the minimum in the documentation
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      podLabels:
+        b2.genesiscloud.dev/allow-to-apiserver: "true"
+      resources:
+        limits:
+          # Default is 128Mi, but apparently that's not enough
+          memory: 2Gi
+
+    reportsController:
+      replicas: 2 # 2 is given as the minimum in the documentation
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      podLabels:
+        b2.genesiscloud.dev/allow-to-apiserver: "true"

@@ -1,0 +1,16 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-netbox-access
+spec:
+  selector: b2.genesiscloud.dev/allow-to-netbox-access == 'true'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: netbox-access
+          namespace: infra

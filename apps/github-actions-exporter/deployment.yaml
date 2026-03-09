@@ -1,0 +1,81 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: github-actions-exporter
+  name: github-actions-exporter
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: github-actions-exporter
+  template:
+    metadata:
+      labels:
+        app: github-actions-exporter
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+        # yamllint disable-line rule:line-length
+        - image: spendeskplatform/github-actions-exporter:v1.9.0-beta1  # TODO update once stable 1.9 is out https://genesiscloud.atlassian.net/browse/B2-606
+          name: github-actions-exporter
+          env:
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: github-actions-exporter
+                  key: appId
+            - name: GITHUB_APP_INSTALLATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: github-actions-exporter
+                  key: installationId
+            - name: GITHUB_APP_PRIVATE_KEY
+              value: /run/secrets/github-actions-exporter/privateKey
+            - name: GITHUB_ORGAS
+              value: gc-private
+            - name: GITHUB_REFRESH
+              value: "1800"  # We have a ton of repos, so only scan every 30min to not spam the API
+          volumeMounts:
+            - name: secret
+              mountPath: /run/secrets/github-actions-exporter
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 9999
+              protocol: TCP
+      volumes:
+        - name: secret
+          secret:
+            secretName: github-actions-exporter
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-actions-exporter
+  labels:
+    app: github-actions-exporter
+spec:
+  ports:
+    - port: 9999
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: github-actions-exporter
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: github-actions-exporter
+spec:
+  selector:
+    matchLabels:
+      app: github-actions-exporter
+  endpoints:
+  - port: http

@@ -1,0 +1,13 @@
+---
+# Dummy IPPool to make Calico announce the VIP towards its BGP peers if it's active on the local host
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: api-server-vip
+spec:
+  blockSize: 32
+  cidr: ${b2_api_vip}/32
+  ipipMode: Never
+  natOutgoing: true
+  nodeSelector: "!all()"
+  vxlanMode: Never

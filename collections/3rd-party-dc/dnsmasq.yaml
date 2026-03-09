@@ -1,0 +1,28 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: dnsmasq
+  namespace: infra
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: infra
+  path: ./apps/dnsmasq
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      dnsmasq_service_ip: ${dnsmasq_service_ip}
+      kubedns_service_ip: ${kubedns_service_ip}
+      pxe_dhcp_service_ip: ${pxe_dhcp_service_ip}
+      ignition_server: ${ignition_server}
+      l2_underlay_network: ${l2_underlay_network}
+      l2_underlay_netmask: ${l2_underlay_netmask}
+      l2_underlay_gw_ip: ${l2_underlay_gw_ip}
+      l2_underlay_dhcp_range_start_ip: ${l2_underlay_dhcp_range_start_ip}
+      l2_underlay_dhcp_range_end_ip: ${l2_underlay_dhcp_range_end_ip}

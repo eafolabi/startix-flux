@@ -1,0 +1,57 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vast-metrics
+  namespace: customer-operators
+  labels:
+    app: vast-metrics
+spec:
+  selector:
+    matchLabels:
+      app: vast-metrics
+  endpoints:
+    - port: https
+      path: /api/prometheusmetrics/all
+      scheme: https
+      interval: 120s
+      scrapeTimeout: 60s
+      tlsConfig:
+        insecureSkipVerify: true
+      basicAuth:
+        username:
+          name: vast-credentials
+          key: username
+        password:
+          name: vast-credentials
+          key: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vast-metrics
+  namespace: customer-operators
+  labels:
+    app: vast-metrics
+spec:
+  ports:
+    - name: https
+      port: 443
+      targetPort: 443
+  clusterIP: None
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: vast-metrics
+  namespace: customer-operators
+  metadata:
+  labels:
+    app: vast-metrics
+subsets:
+  - addresses:
+      - ip: ${vast_api_ip}
+    ports:
+      - port: 443
+        protocol: TCP
+        name: https

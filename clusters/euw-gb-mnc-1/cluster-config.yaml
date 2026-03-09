@@ -1,0 +1,158 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: flux-system
+  name: cluster-config
+data:
+  environment: euw-gb-mnc-1
+  base_domain: gcdev.zone
+  environment_flag_emoji: "flag-gb"
+  b2_dataplane_network: 10.32.0.0/16
+  b2_service_network: 10.33.0.0/16
+  b2_api_vip: 10.32.0.1
+  kubedns_service_ip: 10.33.0.10
+  elastiflow_service_ip: 10.33.0.20
+  pxe_dhcp_service_ip: 10.33.0.30
+  evpn_rr1_service_ip: 10.33.0.40
+  evpn_rr2_service_ip: 10.33.0.41
+  ntp_service_ip: 10.33.0.50
+  s3_service_ip: 10.33.0.51
+  dns_service_ip: 10.33.0.53
+  dnsmasq_service_ip: 10.33.0.67
+  l2_underlay_network: 10.34.0.0/18
+  l2_underlay_netmask: 255.255.192.0
+  l2_underlay_gw_ip: 10.34.0.1
+  l2_underlay_dhcp_range_start_ip: 10.34.32.0
+  l2_underlay_dhcp_range_end_ip: 10.34.63.254
+  l2_underlay_bgp_control_plane_peers: '[{"easyc-1-control-plane": "10.34.16.0"}, {"easyc-2-control-plane": "10.34.16.1"}, {"easyc-3-control-plane": "10.34.16.2"}]'
+  coredns_reverse_zones: 32.10.in-addr.arpa. 33.10.in-addr.arpa. 36.10.in-addr.arpa. 37.10.in-addr.arpa. 38.10.in-addr.arpa. 39.10.in-addr.arpa.
+  public_dns_service_ip: 10.33.0.6X  # X gets expanded to 0/1/2 for anycast/primary/secondary
+  public_internet_range: 217.138.104.8/29, 217.138.104.16/28, 217.138.104.32/27, 217.138.104.64/26, 217.138.104.128/25
+  public_network_operator_configuration: 3rd-party-dc
+  instance_host_router_range: "2a10:1::/64"
+  number_of_core_router_pods: "3"
+  core_router_edge_a_link: enp1s0f0np0
+  core_router_edge_b_link: unused
+  core_router_edge_a_ipv4: 217.138.104.3/29 217.138.104.4/29 217.138.104.5/29
+  core_router_edge_a_ipv4_gw: 217.138.104.1
+  core_router_edge_b_ipv4: unused
+  core_router_vipv4: 217.138.104.9/29 217.138.104.10/29 217.138.104.11/29 217.138.104.17/28 217.138.104.18/28 217.138.104.19/28 217.138.104.33/27 217.138.104.34/27 217.138.104.35/27 217.138.104.65/26 217.138.104.66/26 217.138.104.67/26 217.138.104.129/25 217.138.104.130/25 217.138.104.131/25
+  core_router_edge_a_ipv6: fe80:7000:0:1::2/64
+  core_router_edge_b_ipv6: fe80:7000:0:2::2/64
+  core_router_vipv6: fe80:7000:14:0::1/64
+  core_router_fixed_ipv6: fe80:7000:14:0::4/64
+  core_router_edge_peers_ipv4: unused
+  core_router_edge_peers_ipv6: unused
+  core_router_anycast_ipv4: 217.138.104.7, 192.168.0.192, 192.168.0.193  # last two not issued
+  core_router_node_flow_ip1: 217.138.104.9/32
+  core_router_node_flow_ip2: 217.138.104.10/32
+  core_router_node_flow_ip3: 217.138.104.11/32
+  akvorado_pvc_size: 40Gi
+  akvorado_service_ip: 10.33.0.81
+  service_anycast_ipv4: 217.138.104.7  # first IP from core_router_anycast_ipv4
+  ingress_anycast_ipv4: 217.138.104.7  # last two IPs from core_router_anycast_ipv4 ;not issued
+  ingress_http_private: 10.33.0.7X  # X gets expanded later
+  ingress_private: 10.32.0.1
+  ingress_public: 217.138.104.6
+  ignition_server: 10.32.0.1:32266
+  join_token_server: 10.32.0.1:31385
+  ceph_pool_ssd: ssd-volume-data
+  ceph_pool_ssd_data: ssd-volume
+  ceph_pool_ssd_cluster: dfb88bd0-836a-4d2e-b3c7-e5d0dddde6ad
+  ceph_pool_hdd: hdd-volume-data
+  ceph_pool_hdd_data: hdd-volume
+  ceph_pool_hdd_cluster: dfb88bd0-836a-4d2e-b3c7-e5d0dddde6ad
+  ceph_pool_ssd2: ssd-volume-data
+  ceph_pool_ssd2_data: ssd-volume
+  ceph_pool_ssd2_cluster: dfb88bd0-836a-4d2e-b3c7-e5d0dddde6ad
+  ceph_clusters_additional_fsids:
+  ceph_monitoring_endpoints: '{ip: 10.36.103.21}'
+  etcd_certs_location: /etc/kubernetes/pki/etcd
+  etcd_backup_sc_name: "replicated2"
+  rook_ceph_nodes: '[{name: easyc-1-control-plane}, {name: easyc-2-control-plane}, {name: easyc-3-control-plane}]'
+  e2e_tests_cron_inst_susp: '"false"'
+  e2e_tests_cron_sg_susp: '"false"'
+  e2e_tests_cron_vol_susp: '"false"'
+  placement_options: '''''''["A","B"]'''''''  # so it makes it successfully through all layers
+  infradev_librenms_ip: 192.168.0.255
+  infradev_flowmon_ip: 192.168.0.255
+  vast_api_ip: 192.168.0.255
+  filesystem_operator_replicas: "0"
+  rdma_network_operator_replicas: "0"
+  ufm_address: 192.168.0.255
+  public_dns_zones: instance.euw-gb-mnc-1.genesiscloudusercontent.com. 104.138.217.in-addr.arpa. 0.0.0.7.0.1.a.2.ip6.arpa. euw-gb-mnc-1.gciprd.com.
+  prometheus_size: 100Gi
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: e2e-tests
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeadm-config
+  namespace: kube-system
+data:
+  ClusterConfiguration: |
+    apiVersion: kubeadm.k8s.io/v1beta3
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        authorization-mode: Node,RBAC
+        feature-gates: APIServerTracing=true
+        tracing-config-file: /cfg/apiserver-tracing.yaml
+      extraVolumes:
+        - name: tracingcfg
+          hostPath: /opt/apiserver-tracing.yaml
+          mountPath: /cfg/apiserver-tracing.yaml
+          readOnly: true
+          pathType: File
+      timeoutForControlPlane: 4m0s
+    certificatesDir: /etc/kubernetes/pki
+    clusterName: kubernetes
+    controlPlaneEndpoint: 10.32.0.1:443
+    controllerManager:
+      extraArgs:
+        bind-address: 0.0.0.0
+      extraVolumes:
+        - name: flexvolume-dir
+          hostPath: /opt/kubernetes/kubelet-plugins/volume/exec
+          mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+          pathType: DirectoryOrCreate
+    dns: {}
+    etcd:
+      local:
+        dataDir: /var/lib/etcd
+        extraArgs:
+          listen-metrics-urls: http://0.0.0.0:2381
+          auto-compaction-mode: periodic
+          auto-compaction-retention: 15m
+    imageRepository: registry.k8s.io
+    kubernetesVersion: v1.29.8
+    networking:
+      dnsDomain: cluster.local
+      podSubnet: 10.36.0.0/14
+      serviceSubnet: 10.33.0.0/16
+    scheduler:
+      extraArgs:
+        bind-address: 0.0.0.0
+        config: /cfg/schedulerconfig.yaml
+      extraVolumes:
+        - name: cfg
+          hostPath: /opt/schedulerconfig.yaml
+          mountPath: /cfg/schedulerconfig.yaml
+          readOnly: true
+          pathType: File
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: instance-specs
+  namespace: e2e-tests
+data:
+  LOG_LEVEL: INFO
+  cpu_nr: "4"
+  ram_gb: "12"
+  accel_type: nvidia.com/rtx-3090

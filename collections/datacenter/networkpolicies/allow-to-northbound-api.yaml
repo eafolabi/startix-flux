@@ -1,0 +1,28 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-northbound-api
+spec:
+  selector: app == 'northbound-api'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: b2.genesiscloud.dev/allow-to-northbound-api == 'true'
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-northbound-api-egress
+spec:
+  selector: b2.genesiscloud.dev/allow-to-northbound-api == 'true'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'northbound-api'

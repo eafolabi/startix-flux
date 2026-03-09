@@ -1,0 +1,41 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: customer-instance-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-customer-instance-operator/customer-instance-operator-flux
+  insecure: true
+  ref:
+    tag: ${customer_instance_operator_flux:=0.22.1}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: customer-instance-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: customer-instance-operator
+  targetNamespace: customer-operators
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      public_dns_service_ip: ${public_dns_service_ip}
+      public_dns_zones: ${public_dns_zones}
+      public_dns_ns_record: ${service_anycast_ipv4}
+      # yamllint disable-line rule:line-length
+      sidecar_storage_manager: ghcr.io/gc-private/b2-docker-image-storage-manager/storage-manager:${storage_manager:=0.20.0}
+      # yamllint disable-line rule:line-length
+      sidecar_instance_tuning: ghcr.io/gc-private/b2-docker-image-instance-tuning/instance-tuning:${instance_tuning_sidecar:=0.6.0}
+      # yamllint disable-line rule:line-length
+      sidecar_network_manager: ghcr.io/gc-private/b2-docker-image-network-manager/network-manager:${network_manager:=0.1.0}
+      storage_target_net: ${storage_target_net:=10.24.11.0/24}

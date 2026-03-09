@@ -1,0 +1,32 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: k8s-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  # yamllint disable-line rule:line-length
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-customer-k8s-operator/customer-k8s-operator-flux
+  insecure: true
+  ref:
+    tag: ${customer_k8s_operator_flux:=0.1.0}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: k8s-operator
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: k8s-operator
+  targetNamespace: customer-operators
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      ccm_version: ${ccm_version:=0.1.0}

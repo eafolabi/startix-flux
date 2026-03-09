@@ -1,0 +1,93 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: coredns
+  namespace: flux-system
+spec:
+  interval: 30m
+  url: https://coredns.github.io/helm
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: coredns
+  namespace: flux-system
+spec:
+  targetNamespace: kube-system
+  releaseName: coredns
+  interval: 60m
+  chart:
+    spec:
+      chart: coredns
+      version: ">=1.0.0,<2.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: coredns
+        namespace: flux-system
+      interval: 10m
+  values:
+    replicaCount: 2
+    # Drain/evict one pod at a time, to ensure that DNS remains available so the new pod can pull its image
+    podDisruptionBudget:
+      maxUnavailable: 1
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - coredns
+              topologyKey: kubernetes.io/hostname
+    servers:
+      - zones:
+          - zone: .
+            # see https://github.com/coredns/helm/issues/212
+            scheme: dns://
+            use_tcp: true  # Use TCP in addition to the default UDP
+        port: 53
+        plugins:
+          - name: errors
+          # Serves a /health endpoint on :8080, required for livenessProbe
+          - name: health
+            configBlock: |-
+              lameduck 5s
+          # Serves a /ready endpoint on :8181, required for readinessProbe
+          - name: ready
+          # Required to query kubernetes API for data
+          - name: kubernetes
+            parameters: cluster.local. ${coredns_reverse_zones}
+            configBlock: |-
+              pods insecure
+              ttl 30
+          # Serves a /metrics endpoint on :9153, required for serviceMonitor
+          - name: prometheus
+            parameters: 0.0.0.0:9153
+          - name: forward
+            parameters: ${environment}.b2.gcdev.zone. ${dns_service_ip}
+          - name: forward
+            parameters: 10.in-addr.arpa. ${dns_service_ip}
+          - name: forward
+            parameters: 16.172.in-addr.arpa. ${dns_service_ip}
+          - name: forward
+            parameters: 17.172.in-addr.arpa. ${dns_service_ip}
+          - name: forward
+            parameters: . 8.8.8.8
+            configBlock: |-
+              max_concurrent 1000
+          - name: cache
+            parameters: 30
+          - name: loop
+          - name: reload
+          - name: loadbalance
+    service:
+      name: "kube-dns"
+      clusterIP: ${kubedns_service_ip}
+      annotations: {}

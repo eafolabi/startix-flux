@@ -1,0 +1,70 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pypi-server
+  name: pypi-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pypi-server
+  template:
+    metadata:
+      labels:
+        app: pypi-server
+        b2.genesiscloud.dev/expose-to-ingress: 'true'
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      volumes:
+        - name: packages
+          persistentVolumeClaim:
+            claimName: pypi-packages
+      containers:
+        # yamllint disable-line rule:line-length
+        - image: pypiserver/pypiserver:v1.5.1
+          name: pypi-server
+          args:
+            - run
+            - --server
+            - gunicorn
+            # Disable authentication, is handled by the Ingress
+            - --authenticate
+            - .
+            - --password
+            - .
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+          volumeMounts:
+            - name: packages
+              mountPath: /data/packages
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pypi-server
+  labels:
+    app: pypi-server
+spec:
+  ports:
+    - port: 8080
+  selector:
+    app: pypi-server
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pypi-packages
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 2Gi

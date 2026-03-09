@@ -1,0 +1,50 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-rook-ceph
+  namespace: external-prometheus
+  labels:
+    app: external-rook-ceph
+spec:
+  ports:
+    - name: http-metrics
+      port: 9283
+      protocol: TCP
+      targetPort: 9283
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-rook-ceph
+  namespace: external-prometheus
+  labels:
+    app: external-rook-ceph
+subsets:
+  - addresses: ${ceph_monitoring_endpoints}
+    ports:
+      - name: http-metrics
+        port: 9283
+        protocol: TCP
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: external-rook-ceph
+  namespace: external-prometheus
+  labels:
+    app: external-rook-ceph
+spec:
+  namespaceSelector:
+    matchNames:
+      - external-prometheus
+  selector:
+    matchLabels:
+      app: external-rook-ceph
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 15s    # tentative

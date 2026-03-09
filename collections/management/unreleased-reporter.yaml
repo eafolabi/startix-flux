@@ -1,0 +1,33 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: unreleased-reporter
+  namespace: default
+spec:
+  interval: 60m0s
+  # yamllint disable-line rule:line-length
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-unreleased-reporter/unreleased-reporter-flux
+  insecure: true
+  ref:
+    tag: ${unreleased_reporter_flux:=1.1.0}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: unreleased-reporter
+  namespace: default
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: unreleased-reporter
+  targetNamespace: default
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}

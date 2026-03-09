@@ -1,0 +1,143 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  interval: 30m
+  url: https://grafana.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: loki
+  namespace: monitoring
+spec:
+  targetNamespace: monitoring
+  releaseName: loki
+  interval: 5m
+  chart:
+    spec:
+      chart: loki
+      version: '>=5.45.0 <5.46.0'
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: monitoring
+      interval: 1m
+  values:
+    backend:
+      extraArgs:
+        - '-config.expand-env=true'
+      extraEnv:
+        - name: S3_LOKI_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: loki-bucket
+              key: BUCKET_HOST
+        - name: S3_LOKI_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: loki-bucket
+              key: AWS_ACCESS_KEY_ID
+        - name: S3_LOKI_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: loki-bucket
+              key: AWS_SECRET_ACCESS_KEY
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      persistence:
+        storageClass: replicated2
+      podLabels:
+        b2.genesiscloud.dev/allow-to-apiserver: "true"
+        b2.genesiscloud.dev/allow-to-rook-rgw: "true"
+        b2.genesiscloud.dev/expose-to-prometheus: "true"
+    read:
+      extraArgs:
+        - '-config.expand-env=true'
+      extraEnv:
+        - name: S3_LOKI_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: loki-bucket
+              key: BUCKET_HOST
+        - name: S3_LOKI_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: loki-bucket
+              key: AWS_ACCESS_KEY_ID
+        - name: S3_LOKI_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: loki-bucket
+              key: AWS_SECRET_ACCESS_KEY
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      podLabels:
+        b2.genesiscloud.dev/allow-to-rook-rgw: "true"
+    write:
+      extraArgs:
+        - '-config.expand-env=true'
+      extraEnv:
+        - name: S3_LOKI_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: loki-bucket
+              key: BUCKET_HOST
+        - name: S3_LOKI_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: loki-bucket
+              key: AWS_ACCESS_KEY_ID
+        - name: S3_LOKI_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: loki-bucket
+              key: AWS_SECRET_ACCESS_KEY
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      persistence:
+        storageClass: replicated2
+      podLabels:
+        b2.genesiscloud.dev/allow-to-rook-rgw: "true"
+
+    loki:
+      auth_enabled: false
+      analytics:
+        reporting_enabled: false
+      storage:
+        bucketNames:
+          chunks: loki-bucket
+          ruler: loki-bucket
+          admin: loki-bucket
+        type: s3
+        s3:
+          # This isn't Flux variable expansion!
+          # Instead, this is passed through to the Loki config file, and `-config.expand-env=true`
+          # then instructs Loki to resolve it using environment variables (which get filled from
+          # the Rook-created secret).
+          endpoint: ${S3_LOKI_HOST}
+          secretAccessKey: ${S3_LOKI_SECRET_ACCESS_KEY}
+          accessKeyId: ${S3_LOKI_ACCESS_KEY_ID}
+          s3ForcePathStyle: true
+          insecure: true
+
+    gateway:
+      enabled: false
+    test:
+      enabled: false  # TODO
+    monitoring:
+      selfMonitoring:
+        enabled: false  # TODO
+        grafanaAgent:
+          installOperator: false  # TODO
+      lokiCanary:
+        enabled: false
+    networkPolicy:
+      # We handle these ourselves, the defaults are weird
+      enabled: false

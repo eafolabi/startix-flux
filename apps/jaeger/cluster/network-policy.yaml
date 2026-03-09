@@ -1,0 +1,19 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-jaeger
+spec:
+  selector: app.kubernetes.io/part-of == 'jaeger'
+  types:
+    - Ingress
+    - Egress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 4317  # OpenTelemetry traces
+          - 4318  # OpenTelemetry traces
+          - 14250 # model.proto traces
+          - 14268 # jaeger.thrift traces

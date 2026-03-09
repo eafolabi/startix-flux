@@ -1,0 +1,15 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-operator-to-k8s-api
+spec:
+  selector: strimzi.io/kind == 'cluster-operator'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        namespaceSelector: all()
+        selector: strimzi.io/kind == 'Kafka'
+  types:
+    - Egress

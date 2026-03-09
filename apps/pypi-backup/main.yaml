@@ -1,0 +1,115 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-pypi-backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "${pypi_backup_sc_name}"
+  resources:
+    requests:
+      storage: 20Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pypi-backup
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # Terminate the job if it has not completed in 8 hours
+      activeDeadlineSeconds: 28800
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: pypi-backup
+        spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+          initContainers:
+            - name: pypi-backup
+              image: public.ecr.aws/aws-cli/aws-cli:2.17.54
+              command: ["/bin/sh", "-c"]
+              args:
+                - |-
+                    set -e
+                    rm -rf /pypi-backup/*
+                    find /pypi-packages | cpio -oH tar --no-absolute-filenames > /pypi-backup/pypi-packages.tar
+                    # to restore from the tar archive with cpio
+                    # cd /pypi-packages; cpio -i --no-absolute-filenames -d -F /pypi-backup/pypi-packages.tar
+              volumeMounts:
+                - mountPath: /pypi-packages
+                  name: pypi-packages
+                  readOnly: true
+                - mountPath: /pypi-backup
+                  name: pypi-backup
+          containers:
+            - name: pypi-backup-upload
+              image: public.ecr.aws/aws-cli/aws-cli:2.17.54
+              command: ["/bin/sh", "-c"]
+              env:
+                - name: CLUSTER_NAME
+                  value: "${environment}"
+              args:
+                - |-
+                    set -e
+                    DATE=$(printf '%(%Y-%m-%d)T\n' -1)
+                    DAY=$(printf '%(%-d)T\n' -1)
+                    if [[ "$DAY" -eq 1 ]]; then
+                      BUCKET="b2-pypi-bar-monthly"
+                    else
+                      BUCKET="b2-pypi-bar-daily-30"
+                    fi
+                    gpg --import /root/gpg/pub
+                    gpg -e -r b2@genesiscloud.com --batch --yes --trust-model=always \
+                      --output /pypi-backup/pypi-packages-"$DATE".tar.gpg /pypi-backup/pypi-packages.tar
+                    aws s3 --endpoint-url https://storage.googleapis.com \
+                      cp /pypi-backup/pypi-packages-"$DATE".tar.gpg s3://"$BUCKET"/"$CLUSTER_NAME"/
+                    rm /pypi-backup/pypi-packages.tar /pypi-backup/pypi-packages-"$DATE".tar.gpg
+              volumeMounts:
+                - name: pypi-backup
+                  mountPath: /pypi-backup
+                - name: b2-gpg-pub-key
+                  mountPath: "/root/gpg"
+                  readOnly: true
+                - name: b2-aws-s3-writer
+                  mountPath: "/root/.aws"
+                  readOnly: true
+          restartPolicy: OnFailure
+          hostNetwork: true
+          volumes:
+            - name: pypi-packages
+              hostPath:
+                path: /srv/pypi-packages
+                type: DirectoryOrCreate
+            - name: pypi-backup
+              persistentVolumeClaim:
+                claimName: pvc-pypi-backup
+            - name: b2-gpg-pub-key
+              secret:
+                secretName: b2-gpg-pub-key
+            - name: b2-aws-s3-writer
+              secret:
+                secretName: b2-aws-s3-writer
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pypi-backup-fail
+spec:
+  groups:
+    - name: pypi-backup.rules
+      rules:
+        - alert: PypiBackupFailure
+          expr: time() - max(kube_cronjob_status_last_successful_time{cronjob="pypi-backup"}) > 3600 * 26
+          labels:
+            severity: warning
+          annotations:
+            summary: Pypi backup was not successful
+            description: >
+              The daily Pypi packages repository backup failed to complete successfully

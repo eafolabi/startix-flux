@@ -1,0 +1,11 @@
+---
+apiVersion: projectcalico.org/v3
+kind: BGPConfiguration
+metadata:
+  name: default
+spec:
+  nodeToNodeMeshEnabled: false
+  serviceClusterIPs:
+    - cidr: ${b2_service_network}
+  serviceExternalIPs:
+    - cidr: 192.0.2.0/32

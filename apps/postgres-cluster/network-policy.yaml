@@ -1,0 +1,80 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cnpg-to-postgres-ingress
+  namespace: kamaji-system
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: kamaji-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: cnpg
+              app.kubernetes.io/name: cloudnative-pg
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-inter-cluster-communication
+  namespace: kamaji-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: cnpg
+      app.kubernetes.io/name: cloudnative-pg
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: kamaji-postgres
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kamaji-postgres-ingress-to-rw-service
+  namespace: kamaji-system
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: kamaji-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: kamaji-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-kamaji-postgres-egress-to-rw-service
+  namespace: kamaji-system
+spec:
+  selector: cnpg.io/cluster == 'kamaji-postgres'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: cnpg.io/cluster == 'kamaji-postgres'
+        ports:
+          - 5432

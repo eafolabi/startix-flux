@@ -1,0 +1,29 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: ssh-host-key
+  namespace: infra
+spec:
+  interval: 60m0s
+  # yamllint disable-line rule:line-length
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-ssh-host-key-signer/ssh-host-key-signer-flux
+  insecure: true
+  ref:
+    tag: ${ssh_host_key_signer_flux:=0.3.1}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ssh-host-key
+  namespace: infra
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: ssh-host-key
+  targetNamespace: infra
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s

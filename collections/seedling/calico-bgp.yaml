@@ -1,0 +1,18 @@
+---
+apiVersion: crd.projectcalico.org/v1
+kind: BGPConfiguration
+metadata:
+  name: default
+spec:
+  nodeToNodeMeshEnabled: false
+  serviceClusterIPs:
+    - cidr: 10.7.0.0/16
+---
+apiVersion: crd.projectcalico.org/v1
+kind: BGPPeer
+metadata:
+  name: b2-seedling
+spec:
+  peerIP: 10.8.2.3
+  asNumber: 65111
+  node: b2-seedling

@@ -1,0 +1,20 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: rook-ceph-cluster-3rd-party-dc
+  namespace: rook-ceph
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: rook-ceph
+  path: ./apps/rook-ceph-cluster/3rd-party-dc
+  prune: false
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: rook-ceph
+    - name: rook-ceph-cluster

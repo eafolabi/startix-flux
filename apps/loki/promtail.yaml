@@ -1,0 +1,62 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: promtail
+  namespace: monitoring
+spec:
+  targetNamespace: monitoring
+  releaseName: promtail
+  interval: 5m
+  chart:
+    spec:
+      chart: promtail
+      version: '>=6.15.0 <6.16.0'
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: monitoring
+      interval: 1m
+
+  values:
+
+    # Resource limits
+    resources:
+      limits:
+        cpu: 200m
+        memory: 300Mi
+      requests:
+        cpu: 10m
+        memory: 50Mi
+
+    # Run on all hosts
+    tolerations:
+      - key: gpu-host
+        operator: Exists
+      - key: cpu-host
+        operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+
+    # Allow to query pods
+    podLabels:
+      b2.genesiscloud.dev/allow-to-apiserver: "true"
+
+    # Don't mount Docker log folder
+    defaultVolumes:
+      - name: run
+        hostPath:
+          path: /run/promtail
+      - name: pods
+        hostPath:
+          path: /var/log/pods
+    defaultVolumeMounts:
+      - name: run
+        mountPath: /run/promtail
+      - name: pods
+        mountPath: /var/log/pods
+        readOnly: true
+
+    config:
+      clients:
+        - url: http://loki-write.monitoring.svc:3100/loki/api/v1/push

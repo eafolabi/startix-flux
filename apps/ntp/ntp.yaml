@@ -1,0 +1,65 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ntp
+  labels:
+    app: ntp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ntp
+  template:
+    metadata:
+      labels:
+        app: ntp
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+        - name: ntp
+          image: cturra/ntp
+          ports:
+            - name: ntp
+              containerPort: 123
+              protocol: UDP
+          env:
+            - name: NTP_SERVERS
+              value: time.cloudflare.com,pool.ntp.org,time.service.uit.no,ptbtime1.ptb.de
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ntp
+  labels:
+    app: ntp
+spec:
+  clusterIP: ${ntp_service_ip}
+  ports:
+    - name: ntp
+      port: 123
+      targetPort: 123
+      protocol: UDP
+  selector:
+    app: ntp
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ntp
+spec:
+  selector: app == 'ntp'
+  egress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports:
+          - 123
+  ingress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports:
+          - 123

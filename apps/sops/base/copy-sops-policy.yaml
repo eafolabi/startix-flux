@@ -1,0 +1,30 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: clone-sops-secret
+spec:
+  generateExistingOnPolicyUpdate: true
+  rules:
+    - name: clone-sops-secret
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+      exclude:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              names:
+                - "customer-project-*"
+      generate:
+        apiVersion: v1
+        kind: Secret
+        name: sops-age
+        namespace: "{{request.object.metadata.name}}"
+        synchronize: true
+        clone:
+          namespace: flux-system
+          name: sops-age-original

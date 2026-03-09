@@ -1,0 +1,32 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: storage-manager
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-storage-manager/storage-manager-flux
+  insecure: true
+  ref:
+    tag: ${storage_manager_flux:=0.20.0}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: storage-manager
+  namespace: customer-operators
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: storage-manager
+  targetNamespace: customer-operators
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      # yamllint disable-line rule:line-length
+      virt_launcher_image: ghcr.io/gc-private/b2-docker-image-kubevirt-launcher/kubevirt-launcher:${kubevirt_launcher:=0.4.0}

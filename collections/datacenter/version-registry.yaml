@@ -1,0 +1,37 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: version-registry
+  namespace: default
+spec:
+  interval: 60m0s
+  # yamllint disable-line rule:line-length
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-version-registry/version-registry-flux
+  insecure: true
+  ref:
+    tag: ${version_registry:=0.1.0}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: version-registry
+  namespace: default
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: version-registry
+  targetNamespace: default
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

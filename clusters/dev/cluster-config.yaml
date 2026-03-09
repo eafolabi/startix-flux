@@ -1,0 +1,135 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: flux-system
+  name: cluster-config
+data:
+  environment: dev
+  base_domain: gcdev.zone
+  environment_flag_emoji: "flag-dev"
+  b2_dataplane_network: 10.8.0.0/16
+  b2_service_network: 10.7.0.0/16
+  b2_api_vip: 10.8.2.1
+  kubedns_service_ip: 10.7.0.10
+  pxe_dhcp_service_ip: 10.7.0.30
+  evpn_rr1_service_ip: 10.7.0.40
+  evpn_rr2_service_ip: 10.7.0.41
+  ntp_service_ip: 10.7.0.50
+  ignition_server: 10.8.2.1:32266
+  join_token_server: 10.8.2.1:31385
+  elastiflow_service_ip: 10.7.0.20
+  coredns_reverse_zones: 7.10.in-addr.arpa. 6.10.in-addr.arpa.
+  public_internet_range: "172.16.0.0/22"
+  instance_host_router_range: "2001:db8:0:de::/64"
+  number_of_core_router_pods: "3"
+  ceph_pool_ssd: b2-ssd-replicated
+  ceph_pool_ssd_data: b2-ssd-erasure
+  ceph_pool_ssd_cluster: unreal-uuid-ssd
+  ceph_pool_ssd2: b2-ssd2-replicated
+  ceph_pool_ssd2_cluster: unreal-uuid-ssd2
+  ceph_pool_ssd2_data: b2-ssd2-erasure
+  ceph_pool_hdd: b2-hdd-replicated
+  ceph_pool_hdd_cluster: unreal-uuid-hdd
+  ceph_pool_hdd_data: b2-hdd-erasure
+  ceph_monitoring_endpoints: '{ip: 192.0.2.0}'
+  etcd_certs_location: /etc/kubernetes/pki/etcd
+  etcd_backup_sc_name: replicated2
+  rook_ceph_nodes: '[{name: qemu-vm1-control-plane}, {name: qemu-vm2-control-plane}, {name: qemu-vm3-control-plane}]'
+  e2e_tests_cron_inst_susp: '"false"'
+  e2e_tests_cron_sg_susp: '"false"'
+  e2e_tests_cron_vol_susp: '"false"'
+  placement_options: '''''''["A","B"]'''''''  # so it makes it successfully through all layers
+  service_anycast_ipv4: 172.31.0.254
+  s3_service_ip: 10.7.0.51
+  dns_service_ip: 10.7.0.53
+  public_dns_service_ip: 10.7.0.6X
+  public_dns_zones: instance.euc-de-dev-1.genesiscloudusercontent.com. 0.254.169.in-addr.arpa. 0.7.0.0.7.9.0.a.2.ip6.arpa. euc-de-dev-1.gciprd.com.
+  core_router_edge_a_link: ensvirt0
+  core_router_edge_b_link: ensvirt1
+  ingress_private: 10.8.2.1
+  ingress_public: 169.254.0.254
+  ingress_http_private: 10.7.0.7X  # X gets expanded later
+  core_router_fixed_ipv6: 2001:db8:0:de::/64
+  core_router_edge_peers_ipv6: 2001:db8:0:de::1
+  core_router_edge_peers_ipv4: 169.254.0.254
+  core_router_edge_a_ipv6: 2001:db8:0:de::2
+  core_router_edge_b_ipv6: 2001:db8:0:de::3
+  core_router_vipv6: 2001:db8:0:de::1/64
+  core_router_edge_a_ipv4: 169.254.0.254
+  core_router_edge_b_ipv4: 169.254.0.254
+  core_router_anycast_ipv4: 169.254.0.254
+  core_router_vipv4: 169.254.0.254
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeadm-config
+  namespace: kube-system
+data:
+  ClusterConfiguration: |
+    apiVersion: kubeadm.k8s.io/v1beta3
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        authorization-mode: Node,RBAC
+        feature-gates: APIServerTracing=true
+        tracing-config-file: /cfg/apiserver-tracing.yaml
+      extraVolumes:
+        - name: tracingcfg
+          hostPath: /opt/apiserver-tracing.yaml
+          mountPath: /cfg/apiserver-tracing.yaml
+          readOnly: true
+          pathType: File
+      timeoutForControlPlane: 4m0s
+    certificatesDir: /etc/kubernetes/pki
+    clusterName: kubernetes
+    controlPlaneEndpoint: 10.8.2.1:443
+    controllerManager:
+      extraArgs:
+        bind-address: 0.0.0.0
+      extraVolumes:
+        - name: flexvolume-dir
+          hostPath: /opt/kubernetes/kubelet-plugins/volume/exec
+          mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+          pathType: DirectoryOrCreate
+    dns: {}
+    etcd:
+      local:
+        dataDir: /var/lib/etcd
+        extraArgs:
+          listen-metrics-urls: http://0.0.0.0:2381
+          auto-compaction-mode: periodic
+          auto-compaction-retention: 15m
+    imageRepository: registry.k8s.io
+    kubernetesVersion: v1.29.8
+    networking:
+      dnsDomain: cluster.local
+      podSubnet: 10.6.0.0/16
+      serviceSubnet: 10.7.0.0/16
+    scheduler:
+      extraArgs:
+        bind-address: 0.0.0.0
+        config: /cfg/schedulerconfig.yaml
+      extraVolumes:
+        - name: cfg
+          hostPath: /opt/schedulerconfig.yaml
+          mountPath: /cfg/schedulerconfig.yaml
+          readOnly: true
+          pathType: File
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: e2e-tests
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: instance-specs
+  namespace: e2e-tests
+data:
+  LOG_LEVEL: INFO
+  cpu_nr: "4"
+  ram_gb: "12"
+  accel_type: nvidia.com/rtx-3080

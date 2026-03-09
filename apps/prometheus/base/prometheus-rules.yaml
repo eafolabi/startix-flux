@@ -1,0 +1,137 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: resource-cleanup-notifier
+  namespace: prometheus
+spec:
+  groups:
+    - name: resource-cleanup-notifier.rules
+      rules:
+        - alert: InstanceCleanupNotify
+          expr: instance_vm_state{state="Running", exported_namespace!~"customer-project-(gws-prd|b2)-.+"}
+          for: 8h
+          labels:
+            severity: warning
+            channel: resource-cleanup-notifications
+          annotations:
+            summary: A instance in a non-production project has been running for a prolonged time.
+            description: >-
+              The instance {{ $labels.exported_namespace }}/{{ $labels.name }} has been running for at least 8 hours.
+              To prevent resource leaks, please check if this instance can be cleaned up.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-notify
+  namespace: prometheus
+spec:
+  groups:
+    - name: node-notify.rules
+      rules:
+        - alert: DiskFullWarningNotify
+          expr: sum((node_filesystem_avail_bytes{fstype!="ramfs",mountpoint!="/usr",mountpoint!="/boot",mountpoint!="/run/torcx/unpack"} * 100) / node_filesystem_size_bytes) without (pod, device) < 20
+          for: 2m
+          labels:
+            severity: warning
+            channel: node-disk-full-notifications
+          annotations:
+            summary: A filesystem on a node has less than 20 percent free disk space available.
+            description: >-
+              The node {{ $labels.instance }} has less than 20 % free disk space available on {{ $labels.mountpoint }} filesystem.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pvc-storage-usage
+  namespace: prometheus
+spec:
+  groups:
+    - name: pvc-storage-usage.rules
+      rules:
+        - alert: PVCIsAlmostFull
+          expr: |
+            (100 * sum(kubelet_volume_stats_used_bytes)     by (persistentvolumeclaim, namespace)
+                 / sum(kubelet_volume_stats_capacity_bytes) by (persistentvolumeclaim, namespace)
+            ) > 80
+          labels:
+            severity: warning
+          annotations:
+            summary: A PVC is almost full
+            description: >
+              The PVC `{{ $labels.persistentvolumeclaim }}` in namespace `{{ $labels.namespace }}`
+              is more than 80% full.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager
+  namespace: prometheus
+spec:
+  groups:
+    - name: cert-manager.rules
+      rules:
+        - alert: CertificateExpiresSoon
+          expr: (certmanager_certificate_expiration_timestamp_seconds != 0) - time() < (15 * 24 * 3600)
+          labels:
+            severity: warning
+          annotations:
+            summary: The Certificate is going to expire
+            description: >
+              The certificate `{{ $labels.name }}` in namespace `{{ $labels.exported_namespace }}`
+              is expiring in {{ $value | humanizeDuration }}.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vpp-buffer-space
+  namespace: prometheus
+spec:
+  groups:
+    - name: vpp.rules
+      rules:
+        - alert: VPPBufferSpaceRunningOut
+          expr: |
+            sum(vpp_stat_scalars{stat="/buffer-pools/default-numa-0/available"} / ignoring(stat) (vpp_stat_scalars{stat="/buffer-pools/default-numa-0/available"} + ignoring(stat) vpp_stat_scalars{stat="/buffer-pools/default-numa-0/used"} + ignoring(stat) vpp_stat_scalars{stat="/buffer-pools/default-numa-0/cached"})) by (instance) < 0.1
+          labels:
+            severity: critical
+          annotations:
+            summary: VPP Buffer space is running out
+            description: >
+              The VPP buffer space on the node `{{ $labels.instance }}` is running out.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: etcd-backup-fail
+spec:
+  groups:
+    - name: etcd-backup.rules
+      rules:
+        - alert: EtcdBackupFailure
+          expr: time() - max(kube_cronjob_status_last_successful_time{cronjob="etcd-backup"}) > 3600 * 26
+          labels:
+            severity: warning
+          annotations:
+            summary: ETCD backup was not successful
+            description: >
+              The daily ETCD backup failed to complete successfully
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: missing-nodes
+  namespace: prometheus
+spec:
+  groups:
+    - name: nodes.rules
+      rules:
+        - alert: MissingKubelets
+          expr: |
+            (group by(node) (ignition_inventory{node!="b2-seedling", node!~"qemu-.*", mode="k8s-node"}) unless group by (node) (kubelet_node_name))
+          labels:
+            severity: warning
+          annotations:
+            summary: Nodes are added configured but not available in the cluster
+            description: >
+              Some nodes are present in the ignition_inventory but are not avaliable in the cluster

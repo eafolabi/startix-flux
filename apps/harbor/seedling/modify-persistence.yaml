@@ -1,0 +1,16 @@
+---
+- op: replace
+  path: /spec/values/persistence/persistentVolumeClaim/registry/storageClass
+  value: local-storage
+- op: replace
+  path: /spec/values/persistence/persistentVolumeClaim/jobservice/jobLog/storageClass
+  value: local-storage
+- op: replace
+  path: /spec/values/persistence/persistentVolumeClaim/jobservice/scanDataExports/storageClass
+  value: local-storage
+- op: replace
+  path: /spec/values/persistence/persistentVolumeClaim/database/storageClass
+  value: local-storage
+- op: replace
+  path: /spec/values/persistence/persistentVolumeClaim/redis/storageClass
+  value: local-storage

@@ -1,0 +1,19 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - storageclass.yaml
+  - ../base
+patches:
+  - path: modify-persistence.yaml
+    target:
+      group: helm.toolkit.fluxcd.io
+      kind: HelmRelease
+      name: harbor
+      version: v2beta1
+  - path: disable-servicemonitor.yaml
+    target:
+      group: helm.toolkit.fluxcd.io
+      kind: HelmRelease
+      name: harbor
+      version: v2beta1

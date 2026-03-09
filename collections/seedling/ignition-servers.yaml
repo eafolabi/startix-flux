@@ -1,0 +1,294 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: ignition-server
+  namespace: infra
+spec:
+  interval: 60m0s
+  url: oci://harbor.harbor/ghcr.io/gc-private/b2-docker-image-ignition-server/ignition-server-flux
+  insecure: true
+  ref:
+    tag: ${ignition_server_version:=0.55.3}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ignition-server
+  namespace: infra
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: OCIRepository
+    name: ignition-server
+    namespace: infra
+  targetNamespace: infra
+  path: ./
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      # yamllint disable-line rule:line-length
+      image_nginx_url: ghcr.io/gc-private/b2-docker-image-ignition-nginx/ignition-nginx:${ignition_nginx:=0.21.3}
+  patches:
+    - target:
+        kind: CronJob
+        labelSelector: "app=inventory-sync"
+      patch: |
+        - op: replace
+          path: /spec/suspend
+          value: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: ignition-server
+  name: ignition-inventory
+  namespace: infra
+data:
+  inventory.yaml: |
+    ---
+    all:
+      ignition_server: ${ignition_server}
+      join_token_server: ${join_token_server}
+      dns_server: ${kubedns_service_ip}
+      evpn_rr1_server: ${evpn_rr1_service_ip}
+      evpn_rr2_server: ${evpn_rr2_service_ip}
+    # sys4028 control plane hardware type
+    x-sys4028-control: &sys4028-control
+      mode: install
+      installed_mode: k8s-node
+      install_disk_path: pci-0000:00:11.4-ata-1.0
+      join_token: control-plane-host
+      nics:
+        - [ens4f0np0]
+        - [ens4f1np1]
+    # Loki server (Control Plane) hardware type
+    x-loki-control: &loki-control
+      mode: install
+      installed_mode: k8s-node
+      install_disk_path: pci-0000:00:11.5-ata-3.0
+      join_token: control-plane-host
+      nics:
+        - [enp94s0f0np0, ens9f0np0]
+        - [enp94s0f1np1, ens9f1np1]
+    # GPUv2 server hardware type
+    x-gpuv2-control: &gpuv2-control
+      mode: install
+      installed_mode: k8s-node
+      install_disk_path: pci-0000:00:17.0-ata-1.0
+      join_token: control-plane-host
+      nics:
+        - [enp216s0f0np0, ens88f0np0]
+        - [enp216s0f1np1, ens88f1np1]
+    x-gpuv2: &gpuv2
+      join_token: gpu-host
+      nr_hugepages_per_numa: 41216  # 5 * 16G for instances + 512M for SPDK/DPDK
+      storage_disk: /dev/disk/by-path/pci-0000:00:17.0-ata-1.0
+      nics:
+        - [enp216s0f0np0, ens88f0np0]
+        - [enp216s0f1np1, ens88f1np1]
+    x-gpuv2-3090: &gpuv2-3090
+      << : [*gpuv2]
+      nr_hugepages_per_numa: 61696  # 5 * 24G for instances + 512M for SPDK/DPDK
+    # Gaudi2 server hardware type
+    x-gaudi2: &gaudi2
+      join_token: gpu-host
+      nr_hugepages_per_numa: 246016  # 4*120G for instances + 512M for SPDK/DPDK
+      nics:
+        - [enp75s0f0np0, ens93f0np0]
+        - [enp75s0f1np1, ens93f1np1]
+      nvme_local_storage:
+        # We currently only support one local disk in the spdk-node-daemon
+        # - nvme0n1
+        - nvme1n1
+      kernel_args:
+        # Isolate 128 (logical) cores from the scheduler, so that they're free for pinning instances to them.
+        # 0-35 is the first CPU, 36-71 the second CPU, and 72-107 and 108-143 are their respective "fake" SMT cores.
+        #
+        # Of the first four cores on each CPU we reserve one for SPDK/DPDK and leave the rest available for Linux.
+        - isolcpus=0,4-35,36,40-71,72,76-107,108,112-143
+    # Shared settings for Norway
+    x-no-krs-n01: &no-krs-n01
+      network_type: routed-underlay
+    # Shared settings for EMC
+    x-de-muc-emc: &de-muc-emc
+      network_type: routed-underlay
+
+    # Shared settings for QEMU libvirt control plane
+    x-qemu-control: &qemu-control
+      mode: install
+      network_type: routed-underlay
+      installed_mode: k8s-node
+      install_disk_path: pci-0000:04:00.0
+      join_token: control-plane-host
+      nics:
+        - [eth0]
+    # Entry for seedling so that Kyverno can generate the BGPPeer
+    b2-seedling:
+      ip: 10.8.2.2
+      router_ip: 10.8.2.3
+      asn: 65111
+
+    # Norway hosts
+    gc310-gpuv2:
+      << : [*gpuv2-3090, *no-krs-n01]
+      ip: 10.24.3.0
+      router_ip: 10.24.3.1
+      asn: 65400
+      mac:
+        - E4:3D:1A:39:15:CA
+        - E4:3D:1A:39:15:CB
+    gc311-gpuv2:
+      << : [*gpuv2-3090, *no-krs-n01]
+      ip: 10.24.3.2
+      router_ip: 10.24.3.3
+      asn: 65401
+      mac:
+        - E4:3D:1A:39:12:C4
+        - E4:3D:1A:39:12:C5
+    gc312-gpuv2:
+      << : [*gpuv2-3090, *no-krs-n01]
+      ip: 10.24.3.4
+      router_ip: 10.24.3.5
+      asn: 65402
+      mac:
+        - E4:3D:1A:38:9C:38
+        - E4:3D:1A:38:9C:39
+    gc313-gpuv2:
+      << : [*gpuv2-3090, *no-krs-n01]
+      ip: 10.24.3.6
+      router_ip: 10.24.3.7
+      asn: 65403
+      mac:
+        - E4:3D:1A:38:93:14
+        - E4:3D:1A:38:93:15
+    gc314-gpuv2:
+      << : [*gpuv2, *no-krs-n01]
+      ip: 10.24.3.8
+      router_ip: 10.24.3.9
+      asn: 65404
+      mac:
+        - E4:3D:1A:38:C6:44
+        - E4:3D:1A:38:C6:44
+    gc315-gpuv2-control-plane:
+      << : [*gpuv2-control, *no-krs-n01]
+      ip: 10.24.2.4
+      router_ip: 10.24.2.5
+      asn: 65300
+      mac:
+        - E4:3D:1A:38:89:4E
+        - E4:3D:1A:38:89:4F
+    gc316-gpuv2-control-plane:
+      << : [*gpuv2-control, *no-krs-n01]
+      ip: 10.24.2.6
+      router_ip: 10.24.2.7
+      asn: 65301
+      mac:
+        - E4:3D:1A:38:9B:84
+        - E4:3D:1A:38:9B:85
+    gc317-gpuv2-control-plane:
+      << : [*gpuv2-control, *no-krs-n01]
+      ip: 10.24.2.8
+      router_ip: 10.24.2.9
+      asn: 65302
+      mac:
+        - E4:3D:1A:38:9E:AE
+        - E4:3D:1A:38:9E:AF
+    gc318-gpuv2:
+      << : [*gpuv2, *no-krs-n01]
+      ip: 10.24.3.10
+      router_ip: 10.24.3.11
+      asn: 65405
+      mac:
+        - E4:3D:1A:39:85:DE
+        - E4:3D:1A:39:85:DF
+    gc319-gpuv2:
+      << : [*gpuv2, *no-krs-n01]
+      ip: 10.24.3.12
+      router_ip: 10.24.3.13
+      asn: 65406
+      mac:
+        - E4:3D:1A:38:6A:EE
+        - E4:3D:1A:38:6A:EF
+    gc344-gpuv2:
+      << : [*gpuv2-3090, *no-krs-n01]
+      ip: 10.24.3.14
+      router_ip: 10.24.3.15
+      asn: 65407
+      mac:
+        - E4:3D:1A:38:7B:98
+        - E4:3D:1A:38:7B:99
+
+    # QEMU libvirt domains for control plane
+    qemu-vm1-control-plane:
+      << : [*qemu-control]
+      ip: 10.8.2.10
+      router_ip: 10.8.2.11
+      asn: 65303
+      mac:
+        - 52:54:00:39:20:5a
+    qemu-vm2-control-plane:
+      << : [*qemu-control]
+      ip: 10.8.2.12
+      router_ip: 10.8.2.13
+      asn: 65304
+      mac:
+        - 52:54:00:ed:e1:00
+    qemu-vm3-control-plane:
+      << : [*qemu-control]
+      ip: 10.8.2.14
+      router_ip: 10.8.2.15
+      asn: 65305
+      mac:
+        - 52:54:00:d7:5e:7d
+    # QEMU libvirt domain for vSwitch/vRouter
+    # no MAC address parity required between libvirt domain and this value
+    # chosen only for ease on typing during PXE boot
+    qemu-vrouter:
+      mode: router
+      skip_default: true
+      interfaces:
+        eth1:
+          10.9.0.1
+        eth2:
+          10.9.0.5
+        eth3:
+          10.9.0.9
+      ip: 10.8.0.1
+
+    # EMC hosts
+    gc4-loki-control-plane:
+      << : [*loki-control, *de-muc-emc]
+      ip: 10.8.2.4
+      router_ip: 10.8.2.5
+      asn: 65300
+      mac:
+        - B0:26:28:2A:D7:B0
+        - B0:26:28:2A:D7:B1
+    gc5-loki-control-plane:
+      << : [*loki-control, *de-muc-emc]
+      ip: 10.8.2.6
+      router_ip: 10.8.2.7
+      asn: 65301
+      mac:
+        - B0:26:28:2A:73:50
+        - B0:26:28:2A:73:51
+    gc10-loki-control-plane:
+      << : [*loki-control, *de-muc-emc]
+      ip: 10.8.2.8
+      router_ip: 10.8.2.9
+      asn: 65302
+      mac:
+        - B0:26:28:37:6A:F0
+        - B0:26:28:37:6A:F1
+    gc357-gaudi2:
+      << : [*gaudi2, *de-muc-emc]
+      ip: 10.8.3.2
+      router_ip: 10.8.3.3
+      asn: 65400
+      mac:
+        - 7C:C2:55:42:42:B0
+        - 7C:C2:55:42:42:B1

@@ -1,0 +1,22 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-nfd-internal
+  namespace: node-feature-discovery
+spec:
+  selector: all()
+  ingress:
+    - action: Allow
+      source:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "node-feature-discovery"
+  egress:
+    - action: Allow
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "node-feature-discovery"
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: kubernetes
+          namespace: default

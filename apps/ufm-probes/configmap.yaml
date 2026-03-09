@@ -1,0 +1,119 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: json-exporter-config
+  namespace: prometheus
+  labels:
+    app: json-exporter
+data:
+  config.yml: |
+    modules:
+      ufm_systems: # system/switch temperature
+        http_client_config:
+          basic_auth:
+            username_file: /etc/ufm-auth/username
+            password_file: /etc/ufm-auth/password
+          tls_config:
+            insecure_skip_verify: true
+        metrics:
+        - name: ufm_switch_temperature
+          path: '{ [*] }'
+          type: object
+          help: "UFM port number"
+          labels:
+            system_name: '{ .system_name }'
+            temperature: '{ .temperature }'
+            total_alarms: '{ .total_alarms }'
+            cpu_speed: '{ .cpu_speed }'
+            ram: '{ .ram }'
+            state: '{ .state }'
+            ambient_temperature: '{ .ambient_temperature }'
+          values:
+            status: 0
+      ufm_modules: # fan/psu failures
+        http_client_config:
+          basic_auth:
+            username_file: /etc/ufm-auth/username
+            password_file: /etc/ufm-auth/password
+          tls_config:
+            insecure_skip_verify: true
+        metrics:
+        - name: ufm_fan_status
+          path: '{ [*] }'
+          type: object
+          help: "UFM Fan status"
+          labels:
+            device_name: '{ .device_name }'
+            status: '{ .status }'
+            path: '{ .path }'
+            device_type: '{ .device_type }'
+            name: '{ .name }'
+            description: '{ .description }'
+          values:
+            status: 0
+      ufm_alarms:
+        http_client_config:
+          basic_auth:
+            username_file: /etc/ufm-auth/username
+            password_file: /etc/ufm-auth/password
+          tls_config:
+            insecure_skip_verify: true
+        metrics:
+        - name: ufm_alarms
+          path: '{ [*] }'
+          type: object
+          help: "UFM Alarms"
+          labels:
+            type: '{ .type }'
+            name: '{ .name }'
+            event_type: '{ .event_type }'
+            severity: '{ .severity }'
+            object_path: '{ .object_path }'
+            object_name: '{ .object_name }'
+          values:
+            status: 0
+      ufm_events:
+        http_client_config:
+          basic_auth:
+            username_file: /etc/ufm-auth/username
+            password_file: /etc/ufm-auth/password
+          tls_config:
+            insecure_skip_verify: true
+        metrics:
+        - name: ufm_events
+          path: '{ [*] }'
+          type: object
+          help: "UFM Events"
+          labels:
+            id: '{ .id }'
+            type: '{ .type }'
+            name: '{ .name }'
+            event_type: '{ .event_type }'
+            severity: '{ .severity }'
+            object_path: '{ .object_path }'
+            object_name: '{ .object_name }'
+          values:
+            status: 0
+      ufm_ports:
+        http_client_config:
+          basic_auth:
+            username_file: /etc/ufm-auth/username
+            password_file: /etc/ufm-auth/password
+          tls_config:
+            insecure_skip_verify: true
+        metrics:
+        - name: ufm_ports
+          path: '{ [*] }'
+          type: object
+          help: "UFM Ports"
+          labels:
+            number: '{ .number }'
+            lid: '{ .lid }'
+            physical_state: '{ .physical_state }'
+            path: '{ .path }'
+            peer_node_name: '{ .peer_node_name }'
+            system_name: '{ .system_name }'
+            temperature: '{ .cable_info.temperature }'
+          values:
+            status: 0

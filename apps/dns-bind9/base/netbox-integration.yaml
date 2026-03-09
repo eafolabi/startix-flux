@@ -1,0 +1,152 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: dns-netbox-sync
+  name: dns-netbox-sync
+spec:
+  schedule: "35 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: dns-netbox-sync
+            b2.genesiscloud.dev/allow-to-apiserver: "true"
+        spec:
+          serviceAccountName: dns-netbox-sync
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+          volumes:
+            - name: netbox-key
+              secret:
+                secretName: netbox-key
+                defaultMode: 256  # 0400
+          containers:
+            - name: dns-netbox-sync
+              image: nixery.dev/shell/curl/openssh/jq/yq/gnused/kubectl
+              env:
+                - name: DNSSERVICEIP
+                  value: ${dns_service_ip:="192.0.2.0"}
+                - name: CLUSTER_ENV
+                  value: ${environment}
+              volumeMounts:
+                - mountPath: /run/secrets/netbox-key
+                  name: netbox-key
+              command:
+                - bash
+                - -eEuc
+                - |
+                  # SSH complains without this
+                  echo 'root:x:0:0::/root:/bin/bash' > /etc/passwd
+
+                  # Store parsed bind9 zone payload
+                  mkdir /tmp/netbox-zones
+
+                  # Establish SSH connection to Netbox VM
+                  sshUser=$(cat /run/secrets/netbox-key/userName)
+                  sshHost=$(cat /run/secrets/netbox-key/hostName)
+                  ssh -f -N -M -S /run/ssh \
+                      -L 9000:localhost:9000 \
+                      -i /run/secrets/netbox-key/sshKey \
+                      -o StrictHostKeyChecking=no \
+                      $sshUser@$sshHost
+
+                  # Launch Netbox script job
+                  netboxToken=$(cat /run/secrets/netbox-key/netboxToken)
+                  netboxSite=$(cat /run/secrets/netbox-key/netboxSite)
+                  resultURL=$(curl --insecure --fail -X POST \
+                      -s "http://localhost:9000/api/extras/scripts/GenerateB2DNSZone.GenerateB2DNSZone/" \
+                      -H "Authorization: Token $netboxToken" \
+                      -H "Content-Type: application/json" \
+                      -H "Accept: application/json; indent=4" \
+                      --data "{\"data\":{\"site\":\"$netboxSite\"},\"commit\":false}" \
+                    | jq -r .result.url \
+                    | sed 's|.*/api/|http://localhost:9000/api/|')
+
+                  # Wait for Job to be complete
+                  for _ in $(seq 0 5)
+                  do
+                      curl --insecure --fail -X GET -H "Authorization: Token $netboxToken" "$resultURL" \
+                        | jq -r 'select(.status.value = "completed") | .data.output' > /tmp/combined.out
+                      [[ "$(cat /tmp/combined.out)" != "null" ]] && break || sleep 5
+                  done
+
+                  # Ensure we got a valid result
+                  [[ -n "$(cat /tmp/combined.out)" && "$(cat /tmp/combined.out)" != "null" ]]
+
+                  # Close SSH tunnel
+                  ssh -S /run/ssh -O exit foo
+
+                  # Generate forward and reverse zone files with the names we care about and
+                  # replace the respective placeholders
+                  yq -r '."db.'$CLUSTER_ENV'.b2.gcdev.zone"' /tmp/combined.out > /tmp/netbox-zones/db.b2.gcdev.zone
+                  sed -i "s|DNSSERVICEIPPLACEHOLDER|$DNSSERVICEIP|g" /tmp/netbox-zones/db.b2.gcdev.zone
+
+                  yq -r '."db.in-addr.arpa"' /tmp/combined.out > /tmp/netbox-zones/db.in-addr.arpa
+                  REVERSEDDNSSERVICEIP=$(
+                    sed -rn 's|^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$|\4.\3.\2.\1|p' <<< "$DNSSERVICEIP"
+                  )
+                  sed -i "s|DNSSERVICEIPPLACEHOLDER|$REVERSEDDNSSERVICEIP|g" /tmp/netbox-zones/db.in-addr.arpa
+
+                  # Check if the payload of the files contains a string that we expect
+                  # Use sed as grep; if pattern not found exit code is 5
+                  if sed -zn 's/^$TTL 86400//; t; Q5' /tmp/netbox-zones/db.b2.gcdev.zone &&
+                    sed -zn 's/^$TTL 86400//; t; Q5' /tmp/netbox-zones/db.in-addr.arpa;
+                    then
+                      # Update ConfigMap
+                      # TODO: compare existing cm with new and replace only if something changed
+                      kubectl create configmap -n noc b2-gcdev-zones \
+                        --from-file=/tmp/netbox-zones/ -o yaml --dry-run=client \
+                        | kubectl replace -f -
+                    else
+                      echo "Failed to find required test string in either of the two zone files, not updating configmap"
+                  fi
+                  # bind9 reloads by a watcher in its own container, nothing to do here
+          restartPolicy: OnFailure
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ssh-netbox
+spec:
+  selector: app == 'dns-netbox-sync'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:  # Needs to connect the Netbox instance via SSH
+          - 22
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dns-netbox-sync
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - "b2-gcdev-zones"
+    verbs:
+      - update
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dns-netbox-sync
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dns-netbox-sync
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dns-netbox-sync
+subjects:
+  - kind: ServiceAccount
+    name: dns-netbox-sync

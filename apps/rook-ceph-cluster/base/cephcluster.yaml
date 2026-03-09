@@ -1,0 +1,86 @@
+---
+apiVersion: ceph.rook.io/v1
+kind: CephCluster
+metadata:
+  name: rook-ceph
+  namespace: rook-ceph
+spec:
+  cephVersion:
+    image: quay.io/ceph/ceph:v19.2.2-20250409
+    allowUnsupported: false
+  dataDirHostPath: /var/lib/rook
+  skipUpgradeChecks: false
+  continueUpgradeAfterChecksEvenIfNotHealthy: false
+  waitTimeoutForHealthyOSDInMinutes: 10
+  mon:
+    count: 3
+    allowMultiplePerNode: false
+  mgr:
+    count: 2
+    allowMultiplePerNode: false
+    modules:
+      - name: pg_autoscaler
+        enabled: true
+  dashboard:
+    enabled: true
+    ssl: false
+  monitoring:
+    enabled: true
+  labels:
+    mgr:
+      b2.genesiscloud.dev/expose-to-prometheus: 'true'
+    exporter:
+      b2.genesiscloud.dev/expose-to-prometheus: 'true'
+  network:
+    connections:
+      encryption:
+        enabled: false
+      compression:
+        enabled: false
+  crashCollector:
+    disable: false
+  cleanupPolicy:
+    confirmation: ""
+    sanitizeDisks:
+      method: quick
+      dataSource: zero
+      iteration: 1
+    allowUninstallWithVolumes: false
+  removeOSDsIfOutAndSafeToRemove: false
+  storage:
+    useAllDevices: true
+    config:
+      encryptedDevice: "true"
+    nodes: []
+  healthCheck:
+    livenessProbe:
+      mon:
+        disabled: false
+        probe:
+          timeoutSeconds: 30
+      mgr:
+        disabled: false
+        probe:
+          timeoutSeconds: 30
+      osd:
+        disabled: false
+        probe:
+          timeoutSeconds: 30
+    startupProbe:
+      mon:
+        disabled: false
+        probe:
+          timeoutSeconds: 30
+      mgr:
+        disabled: false
+        probe:
+          timeoutSeconds: 30
+      osd:
+        disabled: false
+        probe:
+          timeoutSeconds: 30
+  placement:
+    all:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists

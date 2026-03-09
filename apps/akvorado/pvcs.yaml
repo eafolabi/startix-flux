@@ -1,0 +1,85 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    akvorado.service: akvorado-clickhouse
+  name: akvorado-clickhouse
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: ${akvorado_pvc_size}
+  storageClassName: replicated2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    akvorado.service: akvorado-console-db
+  name: akvorado-console-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: replicated2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    akvorado.service: akvorado-geoip
+  name: akvorado-geoip
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: fs-replicated2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    akvorado.service: akvorado-kafka
+  name: akvorado-kafka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # It's configured for 8 partitions, each segment can be 1Gi and at most 2 segments are stored
+      storage: 16Gi
+  storageClassName: replicated2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    akvorado.service: akvorado-run
+  name: akvorado-run
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: replicated2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    akvorado.service: akvorado-zookeeper
+  name: akvorado-zookeeper
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: replicated2

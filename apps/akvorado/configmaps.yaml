@@ -1,0 +1,388 @@
+---
+apiVersion: v1
+data:
+  akvorado.yaml: |
+    ---
+    # This configuration file is documented in docs/02-configuration.md.
+    # You can get all default values with `akvorado orchestrator /dev/null
+    # --dump --check` or `docker compose run akvorado-orchestrator
+    # orchestrator /dev/null --dump --check`.
+
+    kafka:
+      topic: flows
+      version: 3.3.1
+      brokers:
+        - kafka:9092
+      topic-configuration:
+        num-partitions: 8
+        replication-factor: 1
+        config-entries:
+          # The retention policy in Kafka is mainly here to keep a buffer
+          # for ClickHouse.
+          segment.bytes: 1073741824
+          retention.ms: 86400000 # 1 day
+          cleanup.policy: delete
+          compression.type: producer
+
+    geoip:
+      optional: true
+      # When running on Docker, these paths are inside the container. By default,
+      # IPinfo databases are used. (https://ipinfo.io/)
+      asn-database:
+        - /usr/share/GeoIP/asn.mmdb
+      geo-database:
+        - /usr/share/GeoIP/country.mmdb
+      # If you want to use MaxmindDB, check `.env`, `docker-compose-maxmind.yml` and
+      # update these paths:
+      #asn-database:
+      # - /usr/share/GeoIP/GeoLite2-ASN.mmdb
+      #geo-database:
+      # - /usr/share/GeoIP/GeoLite2-Country.mmdb
+
+    clickhouse:
+      orchestrator-url: http://akvorado-orchestrator:8080
+      kafka:
+        consumers: 4
+      servers:
+        - clickhouse:9000
+      prometheus-endpoint: /metrics
+      asns:
+        64501: ACME Corporation
+      networks:
+        # You should customize this section with your networks. This
+        # populates the Src/DstNetName/Role/Site/Region/Tenant fields.
+        # added our own DC network here
+        147.189.200.0/26:
+          name: ipv4-core_nord-no-krs-1
+          role: core
+          site: nord-no-krs-1
+          asn: 209045
+        147.189.200.0/22:
+          name: ipv4-customer_nord-no-krs-1
+          role: customer
+          site: nord-no-krs-1
+          asn: 209045
+        147.189.207.0/26:
+          name: ipv4-core_euc-de-muc-1
+          role: core
+          site: euc-de-muc-1
+          asn: 209045
+        147.189.207.0/24:
+          name: ipv4-customer_euc-de-muc-1
+          role: customer
+          site: euc-de-muc-1
+          asn: 209045
+        202.181.153.0/24:
+          name: ipv4-core_euw-nl-ams-1
+          role: core
+          site: euw-nl-ams-1
+          asn: 209045
+        203.28.15.0/24:
+          name: ipv4-customer_euw-nl-ams-1
+          role: customer
+          site: euw-nl-ams-1
+          asn: 209045
+        217.138.104.0/29:
+          name: ipv4-core_euw-gb-mnc-1
+          role: core
+          site: euw-nl-ams-1
+          asn: 209045
+        217.138.104.8/29:
+          name: ipv4-customer_euw-gb-mnc-1
+          role: customer
+          site: euw-nl-ams-1
+          asn: 209045
+        217.138.104.16/28:
+          name: ipv4-customer_euw-gb-mnc-1
+          role: customer
+          site: euw-nl-ams-1
+          asn: 209045
+        217.138.104.32/27:
+          name: ipv4-customer_euw-gb-mnc-1
+          role: customer
+          site: euw-nl-ams-1
+          asn: 209045
+        217.138.104.64/26:
+          name: ipv4-customer_euw-gb-mnc-1
+          role: customer
+          site: euw-nl-ams-1
+          asn: 209045
+        217.138.104.128/25:
+          name: ipv4-customer_euw-gb-mnc-1
+          role: customer
+          site: euw-nl-ams-1
+          asn: 209045
+        2a09:7000::/44:
+          name: ipv6-core_nord-no-krs-1
+          role: core
+          site: nord-no-krs-1
+          asn: 209045
+        2a09:7000::/31:
+          name: ipv6-customer_nord-no-krs-1
+          role: customer
+          site: nord-no-krs-1
+          asn: 209045
+        2a09:7007::/44:
+          name: ipv6-core_euc-de-muc-1
+          role: core
+          site: euc-de-muc-1
+          asn: 209045
+        2a09:7007::/36:
+          name: ipv6-customer_euc-de-muc-1
+          role: customer
+          site: euc-de-muc-1
+          asn: 209045
+      network-sources: []
+        # amazon:
+        #   url: https://ip-ranges.amazonaws.com/ip-ranges.json
+        #   interval: 6h
+        #   transform: |
+        #     (.prefixes + .ipv6_prefixes)[] |
+        #     { prefix: (.ip_prefix // .ipv6_prefix), tenant: "amazon", region: .region, role: .service|ascii_downcase }
+        # gcp:
+        #   url: https://www.gstatic.com/ipranges/cloud.json
+        #   interval: 6h
+        #   transform: |
+        #     .prefixes[] |
+        #     { prefix: (.ipv4Prefix // .ipv6Prefix), tenant: "google-cloud", region: .scope }
+
+    inlet: !include "inlet.yaml"
+    console: !include "console.yaml"
+  console.yaml: |
+    ---
+    http:
+      cache:
+        type: redis
+        server: redis:6379
+    database:
+      saved-filters:
+        # These are prepopulated filters you can select in a drop-down
+        # menu. Users can add more filters interactively.
+        - description: "Core_Routers"
+          content: >-
+            InIfBoundary = external AND ExporterRole = "core"
+        - description: "Core_Routers EUC-DE-MUC-1"
+          content: >-
+            InIfBoundary = external AND ExporterRole = "core" AND
+            ExporterAddress IN (147.189.207.129,147.189.207.130,147.189.207.131)
+        - description: "Core_Routers NORD-NO-KRS-1"
+          content: >-
+            InIfBoundary = external AND ExporterRole = "core" AND
+            ExporterAddress IN (147.189.207.129,147.189.207.130,147.189.207.131)
+        - description: "Edge_Routers"
+          content: >-
+            InIfBoundary = external AND ExporterRole = "edge"
+        - description: "Edge_Routers EUC-DE-MUC-1"
+          content: >-
+            InIfBoundary = external AND ExporterRole = "edge" AND
+            ExporterRegion = "euc-de-muc-1"
+        - description: "Edge_Routers NORD-NO-KRS-1"
+          content: >-
+            InIfBoundary = external AND ExporterRole = "edge" AND
+            ExporterRegion = "nord-no-krs-1"
+  inlet.yaml: |
+    ---
+    kafka:
+      compression-codec: zstd
+    metadata:
+      workers: 10
+      provider:
+        - type: static
+          exporters:
+            ${core_router_node_flow_ip1}:
+              name: core-router-0
+              default:
+                name: unknown
+                description: Unknown interface
+                speed: 10000
+              ifindexes:
+                1:
+                  name: lo
+                  description: Loopback
+                  speed: 100000
+                3:
+                  name: eth0
+                  description: K8S pod interface
+                  speed: 100000
+                4:
+                  name: edge-router-a
+                  description: 'Uplink: interface a'
+                  speed: 25000
+                5:
+                  name: edge-router-b
+                  description: 'Uplink: interface b'
+                  speed: 25000
+                6:
+                  name: public-v4
+                  description: Customer Internet IPv4
+                  speed: 25000
+                7:
+                  name: public-v6
+                  description: Customer Internet IPv6
+                  speed: 25000
+                8:
+                  name: host-inet-link
+                  description: Control plane host interface
+                  speed: 100000
+            ${core_router_node_flow_ip2}:
+              name: core-router-1
+              default:
+                name: unknown
+                description: Unknown interface
+                speed: 10000
+              ifindexes:
+                1:
+                  name: lo
+                  description: Loopback
+                  speed: 100000
+                3:
+                  name: eth0
+                  description: K8S pod interface
+                  speed: 100000
+                4:
+                  name: edge-router-a
+                  description: 'Uplink: interface a'
+                  speed: 25000
+                5:
+                  name: edge-router-b
+                  description: 'Uplink: interface b'
+                  speed: 25000
+                6:
+                  name: public-v4
+                  description: Customer Internet IPv4
+                  speed: 25000
+                7:
+                  name: public-v6
+                  description: Customer Internet IPv6
+                  speed: 25000
+                8:
+                  name: host-inet-link
+                  description: Control plane host interface
+                  speed: 100000
+            ${core_router_node_flow_ip3}:
+              name: core-router-2
+              default:
+                name: unknown
+                description: Unknown interface
+                speed: 10000
+              ifindexes:
+                1:
+                  name: lo
+                  description: Loopback
+                  speed: 100000
+                3:
+                  name: eth0
+                  description: K8S pod interface
+                  speed: 100000
+                4:
+                  name: edge-router-a
+                  description: 'Uplink: interface a'
+                  speed: 25000
+                5:
+                  name: edge-router-b
+                  description: 'Uplink: interface b'
+                  speed: 25000
+                6:
+                  name: public-v4
+                  description: Customer Internet IPv4
+                  speed: 25000
+                7:
+                  name: public-v6
+                  description: Customer Internet IPv6
+                  speed: 25000
+                8:
+                  name: host-inet-link
+                  description: Control plane host interface
+                  speed: 100000
+        # SNMP input used for edge-routers. Flows are exported and the exporter then polled via this communitiy
+        - type: snmp
+          communities:
+            ::/0: gc_flow_analyser
+    flow:
+      inputs:
+        - type: udp
+          decoder: sflow
+          listen: :6343
+          workers: 10
+          receive-buffer: 10485760
+        # EMC/GC356 is still using netflow, as this is an Mikrotik router
+        - type: udp
+          decoder: netflow
+          listen: :2055
+          workers: 6
+          receive-buffer: 10485760
+    core:
+      workers: 6
+      default-sampling-rate: 1000
+      exporter-classifiers:
+        # This is an example. This should be customized depending on how
+        # your exporters are named.
+        - ClassifySiteRegex(Exporter.Name, "^([^-]+)-", "$1")
+        - ClassifyRegionRegex(Exporter.Name, "^.*?\\.(.*?)\\.", "$1")
+        - ClassifyTenant("g10d")
+        - ClassifyRoleRegex(Exporter.Name, "(core|edge)", "$1")
+      interface-classifiers:
+        # This is an example. This must be customized depending on the
+        # descriptions of your interfaces. In the following, we assume
+        # external interfaces are named "Transit: Cogent" Or "IX:
+        # FranceIX".
+        - |
+          ClassifyConnectivityRegex(Interface.Description, "^(?i)(transit|peering|pni|ppni|uplink|ix):? ", "$1") &&
+          ClassifyProviderRegex(Interface.Description, "^\\S+?\\s(\\S+)", "$1") &&
+          ClassifyExternal()
+        - ClassifyInternal()
+kind: ConfigMap
+metadata:
+  labels:
+    akvorado.service: akvorado-orchestrator
+  name: akvorado-orchestrator-cm0
+---
+apiVersion: v1
+data:
+  docker-entrypoint.sh: |
+    #!/bin/bash
+    # SPDX-FileCopyrightText: 2024 Free Mobile
+    # SPDX-License-Identifier: AGPL-3.0-only
+
+    set -e
+
+    if [[ $# -lt 1 ]] || [[ "$1" = "--"* ]]; then
+        rm -f /tmp/init.sh
+        while [[ ! -s /tmp/init.sh ]]; do
+            sleep 1
+            echo "Downloading ClickHouse init script..."
+            wget --no-proxy -qO /tmp/init.sh \
+                http://akvorado-orchestrator:8080/api/v0/orchestrator/clickhouse/init.sh || continue
+        done
+        sh /tmp/init.sh
+    fi
+
+    # Use official entrypoint
+    exec /entrypoint.sh "$@"
+kind: ConfigMap
+metadata:
+  annotations:
+    use-subpath: "true"
+  labels:
+    akvorado.service: clickhouse
+  name: clickhouse-cm0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    use-subpath: "true"
+  labels:
+    akvorado.service: clickhouse
+  name: clickhouse-tweaks
+data:
+  gc-tweaks.xml: |
+    <?xml version="1.0"?>
+    <clickhouse>
+      <text_log>
+        <ttl>event_date + INTERVAL 15 DAY DELETE</ttl>
+      </text_log>
+      <query_views_log>
+        <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
+      </query_views_log>
+    </clickhouse>

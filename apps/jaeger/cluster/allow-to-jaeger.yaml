@@ -1,0 +1,17 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-to-jaeger
+spec:
+  selector: b2.genesiscloud.dev/allow-to-jaeger == 'true'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        nets:
+          - ${b2_dataplane_network}
+        ports:
+          - 6831

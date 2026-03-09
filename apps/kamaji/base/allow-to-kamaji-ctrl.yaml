@@ -1,0 +1,31 @@
+---
+# this is required for the gen status pod to access the kamaji cluster
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-gen-status-egress-from-proxy
+spec:
+  selector: b2.genesiscloud.dev/k8s-aas == "true"
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 6443
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-kamaji-port
+spec:
+  selector: b2.genesiscloud.dev/app == 'k8s-cluster-gen-status'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 6443

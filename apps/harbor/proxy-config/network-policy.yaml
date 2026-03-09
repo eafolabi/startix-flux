@@ -1,0 +1,15 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-harbor-proxy-config
+  namespace: harbor
+spec:
+  selector: app == 'harbor-proxy-config'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: harbor
+          namespace: harbor

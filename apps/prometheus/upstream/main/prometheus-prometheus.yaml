@@ -1,0 +1,68 @@
+# yamllint disable
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  labels:
+    app.kubernetes.io/component: prometheus
+    app.kubernetes.io/instance: k8s
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: kube-prometheus
+    app.kubernetes.io/version: 2.54.1
+  name: k8s
+  namespace: prometheus
+spec:
+  alerting:
+    alertmanagers:
+    - apiVersion: v2
+      name: alertmanager-main
+      namespace: prometheus
+      port: web
+  enableFeatures: []
+  externalLabels: {}
+  externalUrl: https://prometheus.${environment}.b2.${base_domain}/
+  image: quay.io/prometheus/prometheus:v2.54.1
+  nodeSelector:
+    kubernetes.io/os: linux
+  podMetadata:
+    labels:
+      app.kubernetes.io/component: prometheus
+      app.kubernetes.io/instance: k8s
+      app.kubernetes.io/name: prometheus
+      app.kubernetes.io/part-of: kube-prometheus
+      app.kubernetes.io/version: 2.54.1
+      b2.genesiscloud.dev/expose-to-ingress: "true"
+  podMonitorNamespaceSelector: {}
+  podMonitorSelector: {}
+  probeNamespaceSelector: {}
+  probeSelector: {}
+  replicas: ${prometheus_replicas}
+  resources:
+    requests:
+      memory: 400Mi
+  retention: ${prometheus_retention}
+  ruleNamespaceSelector: {}
+  ruleSelector: {}
+  scrapeConfigNamespaceSelector: {}
+  scrapeConfigSelector: {}
+  securityContext:
+    fsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  serviceAccountName: prometheus-k8s
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector: {}
+  storage:
+    volumeClaimTemplate:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: ${prometheus_size}
+        storageClassName: ${prometheus_class}
+  tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+  version: 2.54.1

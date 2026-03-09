@@ -1,0 +1,72 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-operator-setup
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/upstream/setup
+  prune: true
+  wait: true
+  timeout: 10m0s
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-operator-main
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./apps/prometheus/upstream/main
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: prometheus-operator-setup
+      namespace: prometheus
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+      environment_flag_emoji: ${environment_flag_emoji}
+      prometheus_retention: 16w
+      prometheus_size: 30Gi
+      prometheus_class: standard
+      prometheus_replicas: '1'
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-base
+  namespace: prometheus
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: prometheus
+  path: ./apps/prometheus/base
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: prometheus-operator-main
+      namespace: prometheus
+  postBuild:
+    substitute:
+      environment: ${environment}
+      base_domain: ${base_domain}
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

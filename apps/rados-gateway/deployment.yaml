@@ -1,0 +1,108 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: rados-gateway-s3-service-cert
+spec:
+  dnsNames:
+    - 's3.${environment}.genesiscloudusercontent.com'
+    - '*.s3.${environment}.genesiscloudusercontent.com'
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt-dns01-cloudflare-prod
+  secretName: rados-gateway-s3-service-cert
+  usages:
+    - digital signature
+    - key encipherment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    wave.pusher.com/update-on-config-change: "true"
+  labels:
+    app: rgw
+  name: rgw
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rgw
+  template:
+    metadata:
+      labels:
+        app: rgw
+    spec:
+      containers:
+        - args:
+            - '-n'
+            - client.rgw.b2
+            - '-d'
+            - >-
+                --rgw_frontends=beast ssl_port=443
+                ssl_certificate=/var/lib/ceph/tls/tls.crt
+                ssl_private_key=/var/lib/ceph/tls/tls.key
+            - '--rgw_enable_apis=s3,admin,iam'
+            - '--debug_rgw=0/5'
+            - '-i'
+            - '/cfg/rgw.yaml'
+          command:
+            - /usr/bin/radosgw
+          image: 'quay.io/ceph/ceph:v17.2.6'
+          livenessProbe:
+            httpGet:
+              port: 443
+              scheme: HTTPS
+          name: radosgw
+          readinessProbe:
+            httpGet:
+              port: 443
+              scheme: HTTPS
+          volumeMounts:
+            - name: ceph
+              mountPath: "/etc/ceph"
+              readOnly: true
+            - name: s3-cert
+              mountPath: "/var/lib/ceph/tls"
+              readOnly: true
+            - name: cfg
+              mountPath: "/cfg"
+              readOnly: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      volumes:
+        - name: ceph
+          secret:
+            secretName: rados-gateway-ceph
+        - name: cfg
+          configMap:
+            name: rgw-config
+        - name: s3-cert
+          secret:
+            secretName: rados-gateway-s3-service-cert
+      securityContext:
+        sysctls:
+          - name: net.ipv4.tcp_congestion_control
+            value: bbr
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: {}
+  labels:
+    app: rgw
+  name: rgw
+spec:
+  externalIPs:
+    - ${service_anycast_ipv4}
+  clusterIP: ${s3_service_ip}
+  ports:
+    - name: rgw-ssl
+      port: 443
+      protocol: TCP
+      targetPort: 443
+  selector:
+    app: rgw
+  type: ClusterIP

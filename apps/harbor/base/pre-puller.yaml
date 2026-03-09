@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pre-puller-creator
+  namespace: harbor
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pre-puller-creator
+  namespace: harbor
+spec:
+  schedule: "49 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            b2.genesiscloud.dev/allow-to-apiserver: "true"
+        spec:
+          restartPolicy: Never
+          serviceAccount: pre-puller-creator
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+          containers:
+            - name: creator
+              image: alpine/k8s:1.28.3
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -exu
+                  set -o pipefail
+
+                  {
+                    cat << "EOF"
+                  apiVersion: apps/v1
+                  kind: DaemonSet
+                  metadata:
+                    name: pre-puller
+                    namespace: harbor
+                  spec:
+                    selector:
+                      matchLabels:
+                        name: pre-puller
+                    template:
+                      metadata:
+                        labels:
+                          name: pre-puller
+                      spec:
+                        tolerations:
+                          - key: node-role.kubernetes.io/control-plane
+                            operator: Exists
+                        volumes:
+                          - name: tmp-bin
+                            emptyDir: {}
+                        containers:
+                          - name: pause
+                            image: k8s.gcr.io/pause:3.2
+                        initContainers:
+                          - name: busybox
+                            image: busybox
+                            command: ["cp", "/bin/echo", "/tmp/bin"]
+                            volumeMounts:
+                              - name: tmp-bin
+                                mountPath: /tmp/bin
+                  EOF
+                  i=0
+                  kubectl get pods -n harbor -o json | \
+                    jq -r '.items[] | (.spec.initContainers[]?, .spec.containers[]) | .image' | sort -u | \
+                    grep -v busybox | grep -v pause | grep -v alpine | grep -v nixery | \
+                    while read image; do
+                    i=$((i+1))
+                    cat << EOF
+                          - name: ctr-$i
+                            image: $image
+                            command: ["/tmp/bin/echo", "Image pulled successfullty!"]
+                            volumeMounts:
+                              - name: tmp-bin
+                                mountPath: /tmp/bin
+                  EOF
+                  done
+                  } | kubectl apply -n harbor -f -
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: harbor
+  name: pre-puller-creator
+rules:
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["patch", "get", "create"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pre-puller-creator
+  namespace: harbor
+subjects:
+  - kind: ServiceAccount
+    name: pre-puller-creator
+roleRef:
+  kind: Role
+  name: pre-puller-creator
+  apiGroup: rbac.authorization.k8s.io

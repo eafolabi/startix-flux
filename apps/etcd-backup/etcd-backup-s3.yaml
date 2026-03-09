@@ -1,0 +1,30 @@
+---
+# yamllint disable rule:line-length
+apiVersion: v1
+data:
+    config: ENC[AES256_GCM,data:ozwhYx5MwqCW1DwdVaD1mqgvYkqkHUSmveAXO2ONrq7Z9NTXAalK1ElW3i/UmyRiMnfN4TklJcQkT5nXASmjOpaj+ZvokREFlr0getbjjRwKTZgvDrRWZ5j35O7+5gJ4Yrp4o5D2598k2ug7NSGDnWsYhAWBwzSRk6ExlsHXDoWO6uNm+z9kGo/HBqeH+PeXdg0UJkCdGipK+g9MGduAbNO1wYu1wwFkTcP5tH1R07j3WoDu69dUh77zJzhRfDDpe0jNqz4V1LpnzhnEFqKgVX5kQZx3e+xFwfDRMFWK9F6qNC4I,iv:O8L/MM7gV+0FLZ7JMPb53vWoyMWHRDad5buunM8g8o0=,tag:dRnwk7DSGRaCk0MIGi0auA==,type:str]
+kind: Secret
+metadata:
+    name: b2-aws-s3-writer
+    namespace: backup
+type: Opaque
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault: []
+    age:
+        - recipient: age1pph82z80u4wlc3flugq509cnfg7hp9054xyprjwv9sqkhvvfndhqjdy89f
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBad3o5UHNHb1RrdWhxVDlL
+            eE1DVTVLK2lKY1VhbnpmWHVHY1E4aXZ3NXhVCklzK1dFVSt2TUVpSTlSbVVDYzF5
+            L3JrWW4yY29wbGRWWnI5VGt6MWp4Yk0KLS0tIE5JVGRvL1FkSThiRW55RXh4U3E3
+            R2pSWDFZWGppQVdzL3VpK29QOHBLeXcKgO6Q0DpUA+mz8VUvliWGvtgp2GP6sxvq
+            OanjdzrCGCT4pMMZwDFvguhfbkbcv0uFxs//gq96L4IDL0IT4fdtGg==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2023-06-02T12:52:53Z"
+    mac: ENC[AES256_GCM,data:jWa9I8EVJSlsW0G5hXt6W7RHDc9gPvQxO9HvXf4ScuWBYskYJEJwCGGdWUCtPqTnWJwmYF7HQB3ulnDw92dLgU+c3YwvLYZYCXNe0cFSBX5aPsamUoRMzwjqJ1PXYRFjoSt/+B/LpU2i1zgRu+4mHHU1Bf+Lr6udy1IRIbkhJLU=,iv:iSm1IKRK2ZjsFr4VGUesMbEoIwlKCw/bznmvFwGImv0=,tag:hGxTRa5pCfT86Bwikj9hWg==,type:str]
+    pgp: []
+    encrypted_regex: ^(data|stringData)$
+    version: 3.7.3

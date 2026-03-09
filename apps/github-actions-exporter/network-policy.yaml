@@ -1,0 +1,20 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-github-actions-exporter
+spec:
+  selector: app == 'github-actions-exporter'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 9999
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports: # needs to talk to the public internet
+          - 80
+          - 443

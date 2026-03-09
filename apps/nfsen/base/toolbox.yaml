@@ -1,0 +1,41 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfcapd-toolbox
+  namespace: nfsen
+  labels:
+    app: nfcapd-toolbox
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: nfcapd-toolbox
+  template:
+    metadata:
+      labels:
+        app: nfcapd-toolbox
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+        - name: nfcapd
+          image: nixery.dev/nfdump/bash/coreutils/findutils
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+          args:
+            - -exuc
+            - exec sleep infinity
+          resources:
+            limits:
+              cpu: 2
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: nfsen

@@ -1,0 +1,90 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: ufm-systems-probe
+  namespace: prometheus
+  labels:
+    release: prometheus
+spec:
+  jobName: ufm_systems_probe
+  module: ufm_systems
+  interval: 30s
+  prober:
+    url: json-exporter.prometheus.svc.cluster.local:7979
+  targets:
+    staticConfig:
+      static:
+        - https://${ufm_address}/ufmRest/resources/systems/
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: ufm-modules-probe
+  namespace: prometheus
+  labels:
+    release: prometheus
+spec:
+  jobName: ufm_modules_probe
+  module: ufm_modules
+  interval: 30s
+  prober:
+    url: json-exporter.prometheus.svc.cluster.local:7979
+  targets:
+    staticConfig:
+      static:
+        - https://${ufm_address}/ufmRest/resources/modules/
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: ufm-alarms-probe
+  namespace: prometheus
+  labels:
+    release: prometheus
+spec:
+  jobName: ufm_alarms_probe
+  module: ufm_alarms
+  interval: 30s
+  prober:
+    url: json-exporter.prometheus.svc.cluster.local:7979
+  targets:
+    staticConfig:
+      static:
+        - https://${ufm_address}/ufmRest/app/alarms/
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: ufm-events-probe
+  namespace: prometheus
+  labels:
+    release: prometheus
+spec:
+  jobName: ufm_events_probe
+  module: ufm_events
+  interval: 30s
+  prober:
+    url: json-exporter.prometheus.svc.cluster.local:7979
+  targets:
+    staticConfig:
+      static:
+        - https://${ufm_address}/ufmRest/app/events/
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: ufm-ports-probe
+  namespace: prometheus
+  labels:
+    release: prometheus
+spec:
+  jobName: ufm_ports_probe
+  module: ufm_ports
+  interval: 30s
+  prober:
+    url: json-exporter.prometheus.svc.cluster.local:7979
+  targets:
+    staticConfig:
+      static:
+        - https://${ufm_address}/ufmRest/resources/ports?cable_info=true

@@ -1,0 +1,183 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka
+spec:
+  types:
+    - Egress
+    - Ingress
+  selector: akvorado.service == 'kafka'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service in { 'zookeeper', 'kafka' }
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service == 'kafka'
+      source:
+        selector: akvorado.service in { 'kafka', 'akvorado-orchestrator', 'akvorado-inlet', 'clickhouse' }
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-zookeeper
+spec:
+  types:
+    - Ingress
+  selector: akvorado.service == 'zookeeper'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service == 'zookeeper'
+      source:
+        selector: akvorado.service == 'kafka'
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-from-orchestrator
+spec:
+  types:
+    - Egress
+  selector: akvorado.service == 'akvorado-orchestrator'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service in { 'clickhouse', 'akvorado-orchestrator', 'kafka' }
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 80
+          - 443
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-orchestrator
+spec:
+  types:
+    - Ingress
+  selector: akvorado.service == 'akvorado-orchestrator'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service == 'akvorado-orchestrator'
+      source:
+        selector: akvorado.service in { 'akvorado-orchestrator', 'akvorado-console', 'clickhouse', 'akvorado-inlet' }
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-clickhouse
+spec:
+  types:
+    - Ingress
+  selector: akvorado.service == 'clickhouse'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service == 'clickhouse'
+      source:
+        selector: akvorado.service in { 'akvorado-orchestrator', 'akvorado-console' }
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-from-clickhouse
+spec:
+  types:
+    - Egress
+  selector: akvorado.service == 'clickhouse'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service in { 'akvorado-orchestrator', 'clickhouse', 'kafka' }
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-from-console
+spec:
+  types:
+    - Egress
+  selector: akvorado.service == 'akvorado-console'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service in { 'clickhouse', 'akvorado-orchestrator', 'redis' }
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-redis
+spec:
+  types:
+    - Ingress
+  selector: akvorado.service == 'redis'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service == 'redis'
+      source:
+        selector: akvorado.service == 'akvorado-console'
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-from-inlet
+spec:
+  types:
+    - Egress
+  selector: akvorado.service == 'akvorado-inlet'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: akvorado.service in { 'akvorado-orchestrator', 'kafka' }
+    - action: Allow
+      protocol: UDP
+      destination:
+        nets:
+          - 147.189.200.0/26
+          - 147.189.207.0/26
+          - 10.8.2.0/24
+          - 10.24.2.0/24
+          - 10.32.0.0/24
+          - 10.48.0.0/24
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-inlet
+spec:
+  types:
+    - Ingress
+  selector: akvorado.service == 'akvorado-inlet'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 10179
+    - action: Allow
+      protocol: UDP
+      source:
+        nets:
+          - 147.189.200.0/26
+          - 147.189.207.0/26
+          - 10.8.2.0/24
+          - 10.24.2.0/24
+          - 10.32.0.0/24
+          - 10.48.0.0/24

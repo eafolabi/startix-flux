@@ -1,0 +1,92 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n-and-sfcapd
+  namespace: nfsen
+  labels:
+    app: nfcapd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfcapd
+  template:
+    metadata:
+      labels:
+        app: nfcapd
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+        - name: nfcapd
+          image: nixery.dev/shell/nfdump
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+          args:
+            - -exuc
+            - nfcapd -M /data -S 1 -t 300 -p 9995
+          resources:
+            limits:
+              cpu: 100m
+              memory: 500Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+        - name: sfcapd
+          image: nixery.dev/shell/nfdump
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+          args:
+            - -exuc
+            - sfcapd -M /data -S 1 -t 300 -p 9996
+          resources:
+            limits:
+              cpu: 100m
+              memory: 500Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: nfsen
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: n-and-sfcapd
+  namespace: nfsen
+  labels:
+    app: nfcapd
+spec:
+  clusterIP: None
+  ports:
+    - port: 9995
+      name: nf
+      protocol: UDP
+    - port: 9996
+      name: sf
+      protocol: UDP
+  selector:
+    app: nfcapd
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-n-and-sfcapd
+  namespace: nfsen
+spec:
+  selector: app == "nfcapd"
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports:
+          - 9995
+          - 9996

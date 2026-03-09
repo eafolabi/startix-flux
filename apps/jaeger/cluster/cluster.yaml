@@ -1,0 +1,50 @@
+---
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: jaeger
+spec:
+  strategy: allInOne
+  storage:
+    options:
+      memory:
+        max-traces: 100000
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+  allInOne:
+    options:
+      query:
+        base-path: /
+    labels:
+      b2.genesiscloud.dev/expose-to-ingress: 'true'
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/auth-signin: https://oauth.${environment}.b2.${base_domain}/oauth2/start
+      nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.ingress.svc.cluster.local/oauth2/auth
+    tls:
+      - hosts:
+          - jaeger.${environment}.b2.${base_domain}
+    pathType: Prefix
+    hosts:
+      - jaeger.${environment}.b2.${base_domain}
+  agent:
+    hostNetwork: true
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - key: cpu-host
+        operator: Exists
+      - key: gpu-host
+        operator: Exists
+    resources:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    strategy:
+      DaemonSet

@@ -1,0 +1,66 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: flux-system
+  name: cluster-config
+data:
+  b2_dataplane_network: 10.8.0.0/16
+  b2_api_vip: 10.8.2.1
+  kubedns_service_ip: 10.7.0.10
+  pxe_dhcp_service_ip: 10.7.0.30
+  ignition_server: 10.8.2.1:32266
+  join_token_server: 10.8.2.1:31385
+  base_domain: gcdev.zone
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeadm-config
+  namespace: kube-system
+data:
+  ClusterConfiguration: |
+    apiVersion: kubeadm.k8s.io/v1beta3
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        authorization-mode: Node,RBAC
+        feature-gates: APIServerTracing=true
+        tracing-config-file: /cfg/apiserver-tracing.yaml
+      extraVolumes:
+        - name: tracingcfg
+          hostPath: /opt/apiserver-tracing.yaml
+          mountPath: /cfg/apiserver-tracing.yaml
+          readOnly: true
+          pathType: File
+      timeoutForControlPlane: 4m0s
+    certificatesDir: /etc/kubernetes/pki
+    clusterName: kubernetes
+    controlPlaneEndpoint: 10.8.2.1:443
+    controllerManager:
+      extraArgs:
+        bind-address: 0.0.0.0
+    dns: {}
+    etcd:
+      local:
+        dataDir: /var/lib/etcd
+        extraArgs:
+          listen-metrics-urls: http://0.0.0.0:2381
+          auto-compaction-mode: periodic
+          auto-compaction-retention: 15m
+    imageRepository: registry.k8s.io
+    kubernetesVersion: v1.29.8
+    networking:
+      dnsDomain: cluster.local
+      podSubnet: 10.6.0.0/16
+      serviceSubnet: 10.7.0.0/16
+    scheduler:
+      extraArgs:
+        bind-address: 0.0.0.0
+        config: /cfg/schedulerconfig.yaml
+      extraVolumes:
+        - name: cfg
+          hostPath: /opt/schedulerconfig.yaml
+          mountPath: /cfg/schedulerconfig.yaml
+          readOnly: true
+          pathType: File

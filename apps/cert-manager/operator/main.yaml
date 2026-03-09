@@ -1,0 +1,66 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: jetstack
+  namespace: ingress
+spec:
+  interval: 30m
+  url: https://charts.jetstack.io
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager
+  namespace: ingress
+spec:
+  targetNamespace: ingress
+  releaseName: cert-manager
+  interval: 5m
+  chart:
+    spec:
+      chart: cert-manager
+      version: v1.17.2
+      sourceRef:
+        kind: HelmRepository
+        name: jetstack
+        namespace: ingress
+      interval: 1m
+  values:
+    extraArgs:
+      - --dns01-recursive-nameservers-only
+      - --dns01-recursive-nameservers=8.8.8.8:53,1.1.1.1:53
+    installCRDs: true
+    podLabels:
+      b2.genesiscloud.dev/allow-to-apiserver: "true"
+      b2.genesiscloud.dev/expose-to-prometheus: "true"
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+    webhook:
+      podLabels:
+        b2.genesiscloud.dev/expose-to-apiserver: 'true'
+        b2.genesiscloud.dev/allow-to-apiserver: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    cainjector:
+      podLabels:
+        b2.genesiscloud.dev/allow-to-apiserver: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    startupapicheck:
+      podLabels:
+        b2.genesiscloud.dev/allow-to-apiserver: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: true
+        namespace: prometheus
+        labels:
+          app.kubernetes.io/part-of: kube-prometheus
+

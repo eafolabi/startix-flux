@@ -1,0 +1,47 @@
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-virt-operator
+spec:
+  selector: kubevirt.io == 'virt-operator'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 8444
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-virt-api
+spec:
+  selector: kubevirt.io == 'virt-api'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports:
+          - 8443
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-kubevirt-internal
+spec:
+  selector: all()
+  ingress:
+    - action: Allow
+      source:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "kubevirt"
+  egress:
+    - action: Allow
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name == "kubevirt"
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: kubernetes
+          namespace: default

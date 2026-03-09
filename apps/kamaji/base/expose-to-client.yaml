@@ -1,0 +1,62 @@
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: expose-k8s-aas-to-operator
+spec:
+  selector: b2.genesiscloud.dev/k8s-aas == 'true'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app.kubernetes.io/name == 'kamaji'
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-operator-to-k8s-aas
+spec:
+  selector: app.kubernetes.io/name == 'kamaji'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: b2.genesiscloud.dev/k8s-aas == 'true'
+
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-k8s-aas-to-postgres
+spec:
+  selector: b2.genesiscloud.dev/k8s-aas == 'true'
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        services:
+          name: kamaji-postgres-rw
+          namespace: kamaji-system
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: allow-k8s-aas-ingress-to-postgres
+spec:
+  selector: cnpg.io/cluster == 'kamaji-postgres'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: b2.genesiscloud.dev/k8s-aas == 'true'
+      destination:
+        ports:
+          - 5432

@@ -1,0 +1,41 @@
+# yamllint disable
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/component: grafana
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: kube-prometheus
+    app.kubernetes.io/version: 11.2.0
+  name: grafana-datasources
+  namespace: prometheus
+stringData:
+  datasources.yaml: |-
+    {
+        "apiVersion": 1,
+        "datasources": [
+            {
+                "access": "proxy",
+                "editable": false,
+                "name": "Prometheus",
+                "type": "prometheus",
+                "uid": "P1809F7CD0C75ACF3",
+                "url": "http://prometheus-k8s.prometheus.svc:9090",
+                "version": 1
+            },
+            {
+                "access": "proxy",
+                "editable": false,
+                "jsonData": {
+                    "maxLines": 1000,
+                    "timeout": 60
+                },
+                "name": "Loki",
+                "type": "loki",
+                "uid": "P8E80F9AEF21F6940",
+                "url": "http://loki-read.monitoring.svc:3100",
+                "version": 1
+            }
+        ]
+    }
+type: Opaque

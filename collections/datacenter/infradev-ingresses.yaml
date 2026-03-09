@@ -1,0 +1,29 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infradev-ingresses
+  namespace: noc
+spec:
+  interval: 60m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: noc
+  path: ./apps/infradev-ingresses
+  prune: true
+  wait: true
+  timeout: 10m0s
+  postBuild:
+    substitute:
+      infradev_librenms_ip: ${infradev_librenms_ip:=192.0.2.0}
+      infradev_flowmon_ip: ${infradev_flowmon_ip:=192.0.2.0}
+      ufm_address: ${ufm_address:=192.0.2.0}
+      vast_api_ip: ${vast_api_ip:=192.0.2.0}
+      environment: ${environment}
+      base_domain: ${base_domain}
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
