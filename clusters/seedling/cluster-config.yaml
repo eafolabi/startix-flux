@@ -5,13 +5,13 @@ metadata:
   namespace: flux-system
   name: cluster-config
 data:
-  b2_dataplane_network: 10.8.0.0/16
-  b2_api_vip: 10.8.2.1
+  b2_dataplane_network: 10.0.0.0/16
+  b2_api_vip: 10.0.0.128
   kubedns_service_ip: 10.7.0.10
   pxe_dhcp_service_ip: 10.7.0.30
-  ignition_server: 10.8.2.1:32266
-  join_token_server: 10.8.2.1:31385
-  base_domain: gcdev.zone
+  ignition_server: 10.0.0.128:32266
+  join_token_server: 10.0.0.128:31385
+  base_domain: volta.zone
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -36,7 +36,7 @@ data:
       timeoutForControlPlane: 4m0s
     certificatesDir: /etc/kubernetes/pki
     clusterName: kubernetes
-    controlPlaneEndpoint: 10.8.2.1:443
+    controlPlaneEndpoint: 10.0.0.128:443
     controllerManager:
       extraArgs:
         bind-address: 0.0.0.0
