@@ -26,7 +26,7 @@ spec:
       initContainers:
         - name: download-ipxe
           # rationale for nixery: there is a ticket in place to remove this
-          image: nixery.dev/shell/curl
+          image: curlimages/curl:latest
           volumeMounts:
             - mountPath: /var/tftpboot
               name: tftp
@@ -41,7 +41,7 @@ spec:
       containers:
         - name: dhcp
           # rationale for nixery: there is a ticket in place to remove this
-          image: nixery.dev/python311/python311packages.scapy
+          image: python:3.11-slim
           env:
             - name: PYTHONPATH
               value: /lib/python3.11/site-packages/
@@ -187,7 +187,7 @@ spec:
                   sock.sendto(bytes(out_bootp / out_dhcp), src)
         - name: tftp
           # rationale for nixery: there is a ticket in place to remove this
-          image: nixery.dev/dnsmasq
+          image: 4km3/dnsmasq:2.85-1
           command:
             - dnsmasq
             - -k
