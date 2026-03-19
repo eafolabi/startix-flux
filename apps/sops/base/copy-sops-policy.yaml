@@ -4,7 +4,6 @@ kind: ClusterPolicy
 metadata:
   name: clone-sops-secret
 spec:
-  generateExistingOnPolicyUpdate: true
   rules:
     - name: clone-sops-secret
       match:
@@ -25,6 +24,7 @@ spec:
         name: sops-age
         namespace: "{{request.object.metadata.name}}"
         synchronize: true
+        generateExisting: true
         clone:
           namespace: flux-system
           name: sops-age-original
