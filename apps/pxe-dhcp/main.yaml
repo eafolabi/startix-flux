@@ -31,8 +31,8 @@ spec:
             - mountPath: /var/tftpboot
               name: tftp
           command:
-            - bash
-            - -eEuc
+            - sh
+            - -euc
             - |
               cd /var/tftpboot
               curl -JLo x86-undionly.kpxe https://boot.ipxe.org/undionly.kpxe
