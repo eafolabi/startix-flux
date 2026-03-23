@@ -6,6 +6,9 @@ metadata:
   namespace: flux-system
 spec:
   interval: 60m0s
+  dependsOn:
+    - name: kyverno
+      namespace: kyverno
   sourceRef:
     kind: GitRepository
     name: flux-system
