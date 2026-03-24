@@ -43,8 +43,6 @@ spec:
           # rationale for nixery: there is a ticket in place to remove this
           image: python:3.11-slim
           env:
-            - name: PYTHONPATH
-              value: /lib/python3.11/site-packages/
             - name: DHCP_IP
               value: ${pxe_dhcp_service_ip}
             - name: TFTP_IP
@@ -56,9 +54,11 @@ spec:
             - name: HTTP_BOOT_FILE
               value: http://${ignition_server}/config/<MAC>/boot.efi
           command:
-            - python3
+            - sh
             - -c
             - |
+              pip install scapy -q
+              python3 - <<'PYEOF'
               import socket
               import logging
               import ipaddress
@@ -185,6 +185,7 @@ spec:
                   log.info(f"Sending IP {peerAddr} to client {pkt.chaddr[0:6].hex()}")
                   out_dhcp = DHCP(options=[(key, value) for key, value in out_options.items()] + ['end'])
                   sock.sendto(bytes(out_bootp / out_dhcp), src)
+              PYEOF
         - name: tftp
           # rationale for nixery: there is a ticket in place to remove this
           image: 4km3/dnsmasq:2.85-1
