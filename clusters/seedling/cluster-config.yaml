@@ -6,11 +6,11 @@ metadata:
   name: cluster-config
 data:
   b2_dataplane_network: 10.8.0.0/16
-  b2_api_vip: 10.8.0.1
+  b2_api_vip: 10.8.2.1
   kubedns_service_ip: 10.7.0.10
   pxe_dhcp_service_ip: 10.7.0.30
-  ignition_server: 10.8.0.1:32266
-  join_token_server: 10.8.0.1:31385
+  ignition_server: 10.8.2.1:32266
+  join_token_server: 10.8.2.1:31385
   base_domain: volta.zone
 ---
 apiVersion: v1
@@ -20,7 +20,7 @@ metadata:
   namespace: kube-system
 data:
   ClusterConfiguration: |
-    apiVersion: kubeadm.k8s.io/v1beta3
+    apiVersion: kubeadm.k8s.io/v1beta4
     kind: ClusterConfiguration
     apiServer:
       extraArgs:
@@ -36,7 +36,7 @@ data:
       timeoutForControlPlane: 4m0s
     certificatesDir: /etc/kubernetes/pki
     clusterName: kubernetes
-    controlPlaneEndpoint: 10.8.0.1:443
+    controlPlaneEndpoint: 10.8.2.1:443
     controllerManager:
       extraArgs:
         bind-address: 0.0.0.0
@@ -49,7 +49,7 @@ data:
           auto-compaction-mode: periodic
           auto-compaction-retention: 15m
     imageRepository: registry.k8s.io
-    kubernetesVersion: v1.35.5
+    kubernetesVersion: v1.34.5
     networking:
       dnsDomain: cluster.local
       podSubnet: 10.6.0.0/16
