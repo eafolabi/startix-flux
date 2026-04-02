@@ -188,7 +188,8 @@ spec:
               PYEOF
         - name: tftp
           # rationale for nixery: there is a ticket in place to remove this
-          image: 4km3/dnsmasq:2.85-1
+          #image: 4km3/dnsmasq:2.85-1
+          image: 4km3/dnsmasq:2.90-r3
           command:
             - dnsmasq
             - -k
@@ -214,6 +215,7 @@ metadata:
 data:
   passwd: |
     root:x:0:0::/:/usr/bin/nologin
+    dnsmasq:x:100:101:dnsmasq:/dev/null:/sbin/nologin
     nobody:x:65534:65534::/:/usr/bin/nologin
 ---
 apiVersion: v1
