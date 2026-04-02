@@ -1,5 +1,5 @@
 ---
-apiVersion: kyverno.io/v2
+apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
   name: clone-sops-secret
